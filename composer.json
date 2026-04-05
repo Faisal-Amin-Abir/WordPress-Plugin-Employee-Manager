@@ -1,0 +1,28 @@
+{
+    "name": "employee/manager",
+    "description": "An employee management plugin for WordPress.",
+    "type": "wordpress-plugin",
+    "license": "GPL2",
+    "authors": [
+        {
+            "name": "Faisal Ami Abir",
+            "email": "faisalamin50106@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/getdokan/wp-kit.git"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "EmployeeManager\\": "includes/"
+        }
+    }
+}
