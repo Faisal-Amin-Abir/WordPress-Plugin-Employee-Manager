@@ -8,9 +8,11 @@ class Settings {
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'rest_api_init', [ $this, 'register_settings' ] );
 
-        // Enforce upload limit with high priority
-        add_filter( 'upload_size_limit', [ $this, 'enforce_max_upload_size' ], 999 );
-        add_filter( 'wp_handle_upload_prefilter', [ $this, 'validate_upload_size' ] );
+        // Very aggressive enforcement
+        add_filter( 'upload_size_limit', [ $this, 'enforce_max_upload_size' ], 9999 );
+        add_filter( 'wp_handle_upload_prefilter', [ $this, 'validate_upload_size' ], 9999 );
+        add_filter( 'plupload_default_params', [ $this, 'update_plupload_limit' ], 9999 );
+        add_filter( 'pre_option_upload_max_filesize', [ $this, 'force_upload_max_filesize' ] );
     }
 
     public function add_settings_page() {
@@ -63,7 +65,7 @@ class Settings {
     public function enforce_max_upload_size( $size ) {
         $max_mb = (int) get_option( 'employee_manager_max_upload_mb', 2 );
         $max_bytes = $max_mb * 1024 * 1024;
-        return min( $size, $max_bytes );
+        return $max_bytes;   // Force our limit
     }
 
     public function validate_upload_size( $file ) {
@@ -74,6 +76,18 @@ class Settings {
             $file['error'] = sprintf( 'File is too big! Maximum allowed size is %d MB.', $max_mb );
         }
         return $file;
+    }
+
+    public function update_plupload_limit( $params ) {
+        $max_mb = (int) get_option( 'employee_manager_max_upload_mb', 2 );
+        $max_bytes = $max_mb * 1024 * 1024;
+        $params['max_file_size'] = $max_bytes;
+        return $params;
+    }
+
+    public function force_upload_max_filesize( $value ) {
+        $max_mb = (int) get_option( 'employee_manager_max_upload_mb', 2 );
+        return $max_mb * 1024 * 1024;
     }
 
     public function render_max_upload_field() {
