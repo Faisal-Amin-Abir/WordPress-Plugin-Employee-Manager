@@ -32,7 +32,7 @@ class Plugin {
      * Plugin Activation Hook with detailed logging
      */
     public static function activate() {
-        error_log( '🚀 Employee Manager: Activation hook STARTED' );
+        error_log( 'Employee Manager: Activation hook STARTED' );
 
         // Create database table
         error_log( '→ Creating database table...' );
@@ -43,17 +43,17 @@ class Plugin {
         error_log( '→ Loading Capabilities class...' );
         
         if ( class_exists( '\\EmployeeManager\\Core\\Capabilities' ) ) {
-            error_log( '✅ Capabilities class found. Creating roles...' );
+            error_log( 'Capabilities class found. Creating roles...' );
             \EmployeeManager\Core\Capabilities::create_roles();
-            error_log( '✅ Roles creation completed.' );
+            error_log( 'Roles creation completed.' );
         } else {
-            error_log( '❌ ERROR: Capabilities class NOT found during activation!' );
+            error_log( 'ERROR: Capabilities class NOT found during activation!' );
         }
 
         // Flush rewrite rules
         flush_rewrite_rules();
 
-        error_log( '🎉 Employee Manager: Activation hook FINISHED' );
+        error_log( 'Employee Manager: Activation hook FINISHED' );
     }
 
     public static function deactivate() {
