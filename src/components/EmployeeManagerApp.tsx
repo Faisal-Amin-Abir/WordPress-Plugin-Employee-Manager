@@ -10,6 +10,7 @@ import apiFetch from '@wordpress/api-fetch';
 
 import EmployeeTable from './EmployeeTable';
 import EmployeeFormModal from './EmployeeFormModal';
+import EmployeeViewModal from './EmployeeViewModal';
 import { Employee } from '../types';
 
 const EmployeeManagerApp: React.FC = () => {
@@ -17,9 +18,11 @@ const EmployeeManagerApp: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
     const [maxUploadMB, setMaxUploadMB] = useState(2);
-    const [isSaving, setIsSaving] = useState(false);   // ← This was missing in some versions
+    const [isSaving, setIsSaving] = useState(false);
 
     // Search & Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -100,6 +103,11 @@ const EmployeeManagerApp: React.FC = () => {
             });
         }
         setIsModalOpen(true);
+    };
+
+    const openViewModal = (employee: Employee) => {
+        setViewingEmployee(employee);
+        setIsViewModalOpen(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -263,6 +271,7 @@ const EmployeeManagerApp: React.FC = () => {
                             onToggleSelect={toggleSelect}
                             onSelectAll={(checked) => setSelectedIds(checked ? filteredEmployees.map(e => e.id!) : [])}
                             onEdit={openModal}
+                            onView={openViewModal}
                             onDelete={(emp) => {
                                 if (confirm(`Delete ${emp.full_name}?`)) {
                                     apiFetch({
@@ -285,8 +294,14 @@ const EmployeeManagerApp: React.FC = () => {
                     onFormChange={setFormData}
                     maxUploadMB={maxUploadMB}
                     onMediaUpload={openMediaLibrary}
-                    isSaving={isSaving}           // ← This was the missing prop causing error
+                    isSaving={isSaving}
                     editingEmployee={editingEmployee}
+                />
+
+                <EmployeeViewModal
+                    isOpen={isViewModalOpen}
+                    onClose={() => setIsViewModalOpen(false)}
+                    employee={viewingEmployee}
                 />
             </div>
         </ThemeProvider>

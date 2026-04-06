@@ -9,6 +9,7 @@ interface EmployeeTableProps {
     onToggleSelect: (id: number) => void;
     onSelectAll: (checked: boolean) => void;
     onEdit: (employee: Employee) => void;
+    onView: (employee: Employee) => void;        // ← Added for View button
     onDelete: (employee: Employee) => void;
     onBulkDelete: () => void;
     onBulkStatusChange: (status: 'active' | 'inactive') => void;
@@ -20,6 +21,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
     onToggleSelect,
     onSelectAll,
     onEdit,
+    onView,                 // ← New
     onDelete,
     onBulkDelete,
     onBulkStatusChange,
@@ -42,7 +44,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Salary</th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Date Joined</th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Status</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Actions</th>
+                    <th style={{ padding: '12px', textAlign: 'center', border: '1px solid #ddd' }}>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,17 +85,36 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                                 {emp.status}
                             </span>
                         </td>
-                        <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                            <Button variant="secondary" onClick={() => onEdit(emp)} style={{ marginRight: '8px' }}>
-                                Edit
-                            </Button>
-                            <Button 
-                                variant="secondary" 
-                                isDestructive 
-                                onClick={() => onDelete(emp)}
-                            >
-                                Delete
-                            </Button>
+                        <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
+                            <div>
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={() => onView(emp)} 
+                                    style={{ marginRight: '8px' }}
+                                >
+                                    View
+                                </Button>
+                            </div>
+                            <br/>
+                            <div>
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={() => onEdit(emp)} 
+                                    style={{ marginRight: '8px' }}
+                                >
+                                    Edit
+                                </Button>
+                            </div> 
+                            <br/>
+                            <div>
+                                <Button 
+                                    variant="secondary" 
+                                    isDestructive 
+                                    onClick={() => onDelete(emp)}
+                                >
+                                    Delete
+                                </Button>
+                            </div>
                         </td>
                     </tr>
                 ))}
