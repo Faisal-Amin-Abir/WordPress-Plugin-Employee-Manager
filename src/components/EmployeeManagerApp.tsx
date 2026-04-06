@@ -24,12 +24,13 @@ const EmployeeManagerApp: React.FC = () => {
     const [maxUploadMB, setMaxUploadMB] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Search & Filters
+    const permissions = (window as any).employeeManager || {};
+    const canManage = permissions.canManage || false;
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDepartment, setFilterDepartment] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
 
-    // Bulk Actions
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
     const [formData, setFormData] = useState<Employee>({
@@ -54,12 +55,24 @@ const EmployeeManagerApp: React.FC = () => {
             }) as any;
             setEmployees(empResponse.data || []);
 
-            const settingsResponse = await apiFetch({
-                path: 'wp/v2/settings',
-            }) as any;
+            // Fetch settings from custom endpoint (allows both admins and managers)
+            try {
+                const settingsResponse = await apiFetch({
+                    path: 'employee-manager/v1/settings',
+                }) as any;
 
-            const maxMB = settingsResponse.employee_manager_max_upload_mb || 2;
-            setMaxUploadMB(maxMB);
+                if (settingsResponse.data && settingsResponse.data.employee_manager_max_upload_mb) {
+                    const maxMB = settingsResponse.data.employee_manager_max_upload_mb;
+                    setMaxUploadMB(maxMB);
+                } else {
+                    setMaxUploadMB(2);
+                }
+            } catch (settingsErr: any) {
+                // Log settings fetch error but don't display it to user
+                console.warn('Could not fetch settings:', settingsErr.message);
+                // Use default value
+                setMaxUploadMB(2);
+            }
 
             setSelectedIds([]);
         } catch (err: any) {
@@ -85,6 +98,8 @@ const EmployeeManagerApp: React.FC = () => {
     });
 
     const openModal = (employee: Employee | null = null) => {
+        if (!canManage) return;
+
         if (employee) {
             setEditingEmployee(employee);
             setFormData({ ...employee });
@@ -112,6 +127,8 @@ const EmployeeManagerApp: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canManage) return;
+
         setIsSaving(true);
 
         try {
@@ -164,7 +181,8 @@ const EmployeeManagerApp: React.FC = () => {
     };
 
     const bulkDelete = async () => {
-        if (selectedIds.length === 0 || !confirm(`Delete ${selectedIds.length} selected employees?`)) return;
+        if (!canManage || selectedIds.length === 0) return;
+        if (!confirm(`Delete ${selectedIds.length} selected employees?`)) return;
 
         try {
             await apiFetch({
@@ -180,7 +198,7 @@ const EmployeeManagerApp: React.FC = () => {
     };
 
     const bulkChangeStatus = async (newStatus: 'active' | 'inactive') => {
-        if (selectedIds.length === 0) return;
+        if (!canManage || selectedIds.length === 0) return;
 
         try {
             await apiFetch({
@@ -201,12 +219,13 @@ const EmployeeManagerApp: React.FC = () => {
                 <Card>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h1 style={{ margin: 0 }}>Employee Manager</h1>
-                        <Button variant="primary" onClick={() => openModal()}>
-                            + Add New Employee
-                        </Button>
+                        {canManage && (
+                            <Button variant="primary" onClick={() => openModal()}>
+                                + Add New Employee
+                            </Button>
+                        )}
                     </div>
 
-                    {/* Search + Filters */}
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '15px', flexWrap: 'wrap' }}>
                         <TextControl
                             placeholder="Search by name or email"
@@ -241,8 +260,7 @@ const EmployeeManagerApp: React.FC = () => {
                         />
                     </div>
 
-                    {/* Bulk Actions Toolbar */}
-                    {selectedIds.length > 0 && (
+                    {selectedIds.length > 0 && canManage && (
                         <div style={{ marginBottom: '15px', padding: '10px', background: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '4px' }}>
                             <strong>{selectedIds.length} selected</strong>
                             <Button variant="secondary" onClick={bulkDelete} style={{ marginLeft: '15px' }}>
@@ -265,23 +283,21 @@ const EmployeeManagerApp: React.FC = () => {
                         <p>No employees found.</p>
                     ) : (
                         <EmployeeTable
-                            employees={employees}
                             filteredEmployees={filteredEmployees}
                             selectedIds={selectedIds}
                             onToggleSelect={toggleSelect}
                             onSelectAll={(checked) => setSelectedIds(checked ? filteredEmployees.map(e => e.id!) : [])}
-                            onEdit={openModal}
+                            onEdit={canManage ? openModal : undefined}
                             onView={openViewModal}
-                            onDelete={(emp) => {
+                            onDelete={canManage ? (emp) => {
                                 if (confirm(`Delete ${emp.full_name}?`)) {
                                     apiFetch({
                                         path: `employee-manager/v1/employees/${emp.id}`,
                                         method: 'DELETE',
                                     }).then(() => fetchData());
                                 }
-                            }}
-                            onBulkDelete={bulkDelete}
-                            onBulkStatusChange={bulkChangeStatus}
+                            } : undefined}
+                            canManage={canManage}
                         />
                     )}
                 </Card>

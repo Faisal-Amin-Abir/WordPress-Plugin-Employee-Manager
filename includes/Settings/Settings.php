@@ -6,7 +6,7 @@ class Settings {
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
-        add_action( 'rest_api_init', [ $this, 'register_settings' ] );
+        add_action( 'rest_api_init', [ $this, 'register_rest_settings' ] );
 
         // Very aggressive enforcement
         add_filter( 'upload_size_limit', [ $this, 'enforce_max_upload_size' ], 9999 );
@@ -16,14 +16,8 @@ class Settings {
     }
 
     public function add_settings_page() {
-        add_submenu_page(
-            'employee-manager',
-            'Employee Manager Settings',
-            'Settings',
-            'manage_options',
-            'employee-manager-settings',
-            [ $this, 'render_settings_page' ]
-        );
+        // Settings page is already added by EmployeeAdmin, so we don't add it again here
+        // This method is kept empty to avoid duplicate menus
     }
 
     public function register_settings() {
@@ -31,35 +25,97 @@ class Settings {
             'type'              => 'integer',
             'sanitize_callback' => 'absint',
             'default'           => 2,
-            'show_in_rest'      => true,
+            'show_in_rest'      => false,  // Don't expose via standard REST
         ]);
 
         register_setting( 'employee_manager_settings', 'employee_manager_allowed_image_types', [
             'type'              => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default'           => 'jpg,jpeg,png,gif',
-            'show_in_rest'      => true,
+            'show_in_rest'      => false,  // Don't expose via standard REST
         ]);
 
-        if ( current_action() === 'admin_init' ) {
-            add_settings_section( 'employee_manager_main', 'General Settings', null, 'employee-manager-settings' );
+        add_settings_section( 'employee_manager_main', 'General Settings', null, 'employee-manager-settings' );
 
-            add_settings_field(
-                'employee_manager_max_upload_mb',
-                'Maximum Upload Size (MB)',
-                [$this, 'render_max_upload_field'],
-                'employee-manager-settings',
-                'employee_manager_main'
-            );
+        add_settings_field(
+            'employee_manager_max_upload_mb',
+            'Maximum Upload Size (MB)',
+            [$this, 'render_max_upload_field'],
+            'employee-manager-settings',
+            'employee_manager_main'
+        );
 
-            add_settings_field(
-                'employee_manager_allowed_image_types',
-                'Allowed Image Types',
-                [$this, 'render_allowed_types_field'],
-                'employee-manager-settings',
-                'employee_manager_main'
-            );
+        add_settings_field(
+            'employee_manager_allowed_image_types',
+            'Allowed Image Types',
+            [$this, 'render_allowed_types_field'],
+            'employee-manager-settings',
+            'employee_manager_main'
+        );
+    }
+
+    /**
+     * Register custom REST endpoint for employee manager settings
+     * This endpoint has proper permission checks for HR Manager role
+     */
+    public function register_rest_settings() {
+        register_rest_route( 'employee-manager/v1', '/settings', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [ $this, 'get_settings' ],
+                'permission_callback' => [ $this, 'check_settings_permission' ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ $this, 'update_settings' ],
+                'permission_callback' => [ $this, 'check_settings_permission' ],
+            ],
+        ]);
+    }
+
+    /**
+     * Check if current user can access settings
+     * Allow super admin and HR Manager role
+     */
+    public function check_settings_permission() {
+        return current_user_can( 'manage_options' ) || current_user_can( 'manage_employee_manager' );
+    }
+
+    /**
+     * GET /employee-manager/v1/settings
+     */
+    public function get_settings() {
+        return new \WP_REST_Response( [
+            'success' => true,
+            'data'    => [
+                'employee_manager_max_upload_mb'   => (int) get_option( 'employee_manager_max_upload_mb', 2 ),
+                'employee_manager_allowed_image_types' => get_option( 'employee_manager_allowed_image_types', 'jpg,jpeg,png,gif' ),
+            ]
+        ], 200 );
+    }
+
+    /**
+     * POST /employee-manager/v1/settings
+     */
+    public function update_settings( \WP_REST_Request $request ) {
+        $data = $request->get_json_params();
+
+        if ( isset( $data['employee_manager_max_upload_mb'] ) ) {
+            update_option( 'employee_manager_max_upload_mb', absint( $data['employee_manager_max_upload_mb'] ) );
         }
+
+        if ( isset( $data['employee_manager_allowed_image_types'] ) ) {
+            update_option( 'employee_manager_allowed_image_types', sanitize_text_field( $data['employee_manager_allowed_image_types'] ) );
+        }
+
+        return new \WP_REST_Response( [
+            'success' => true,
+            'message' => 'Settings updated successfully.',
+            'data'    => [
+                'employee_manager_max_upload_mb'   => (int) get_option( 'employee_manager_max_upload_mb', 2 ),
+                'employee_manager_allowed_image_types' => get_option( 'employee_manager_allowed_image_types', 'jpg,jpeg,png,gif' ),
+            ]
+        ], 200 );
     }
 
     public function enforce_max_upload_size( $size ) {

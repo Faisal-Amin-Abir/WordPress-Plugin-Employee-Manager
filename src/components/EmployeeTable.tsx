@@ -3,16 +3,14 @@ import { Button, CheckboxControl } from '@wordpress/components';
 import { Employee } from '../types';
 
 interface EmployeeTableProps {
-    employees: Employee[];
     filteredEmployees: Employee[];
     selectedIds: number[];
     onToggleSelect: (id: number) => void;
     onSelectAll: (checked: boolean) => void;
-    onEdit: (employee: Employee) => void;
-    onView: (employee: Employee) => void;        // ← Added for View button
-    onDelete: (employee: Employee) => void;
-    onBulkDelete: () => void;
-    onBulkStatusChange: (status: 'active' | 'inactive') => void;
+    onEdit?: (employee: Employee) => void;
+    onView: (employee: Employee) => void;
+    onDelete?: (employee: Employee) => void;
+    canManage: boolean;
 }
 
 const EmployeeTable: React.FC<EmployeeTableProps> = ({
@@ -21,10 +19,9 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
     onToggleSelect,
     onSelectAll,
     onEdit,
-    onView,                 // ← New
+    onView,
     onDelete,
-    onBulkDelete,
-    onBulkStatusChange,
+    canManage,
 }) => {
     return (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -86,17 +83,15 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                             </span>
                         </td>
                         <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
-                            <div>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={() => onView(emp)} 
-                                    style={{ marginRight: '8px' }}
-                                >
-                                    View
-                                </Button>
-                            </div>
-                            <br/>
-                            <div>
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => onView(emp)} 
+                                style={{ marginRight: '8px' }}
+                            >
+                                View
+                            </Button>
+
+                            {canManage && onEdit && (
                                 <Button 
                                     variant="secondary" 
                                     onClick={() => onEdit(emp)} 
@@ -104,9 +99,9 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                                 >
                                     Edit
                                 </Button>
-                            </div> 
-                            <br/>
-                            <div>
+                            )}
+
+                            {canManage && onDelete && (
                                 <Button 
                                     variant="secondary" 
                                     isDestructive 
@@ -114,7 +109,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                                 >
                                     Delete
                                 </Button>
-                            </div>
+                            )}
                         </td>
                     </tr>
                 ))}

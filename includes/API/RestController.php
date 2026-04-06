@@ -2,6 +2,7 @@
 namespace EmployeeManager\API;
 
 use EmployeeManager\Models\Employee;
+use EmployeeManager\Core\Capabilities;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
@@ -89,7 +90,7 @@ class RestController {
         }
 
         // Create, Update, Delete require higher permission
-        return current_user_can( 'manage_options' ) || current_user_can( 'manage_employees' );
+        return current_user_can( 'manage_options' ) || current_user_can( Capabilities::MANAGE_EMPLOYEES );
     }
 
     /**
@@ -124,12 +125,19 @@ class RestController {
     public function create_employee( WP_REST_Request $request ) {
         $data = $request->get_json_params();
 
-        $result = $this->employee_model->create( $data );
-
-        if ( is_wp_error( $result ) ) {
+        if ( empty( $data['full_name'] ) || empty( $data['email'] ) ) {
             return new WP_REST_Response( [
                 'success' => false,
-                'message' => $result->get_error_message()
+                'message' => 'Full name and email are required.'
+            ], 400 );
+        }
+
+        $result = $this->employee_model->create( $data );
+
+        if ( ! $result ) {
+            return new WP_REST_Response( [
+                'success' => false,
+                'message' => 'Failed to create employee. Please check your data.'
             ], 400 );
         }
 
@@ -169,12 +177,21 @@ class RestController {
         $id   = (int) $request['id'];
         $data = $request->get_json_params();
 
-        $result = $this->employee_model->update( $id, $data );
-
-        if ( is_wp_error( $result ) ) {
+        // Verify employee exists
+        $existing = $this->employee_model->get_by_id( $id );
+        if ( ! $existing ) {
             return new WP_REST_Response( [
                 'success' => false,
-                'message' => $result->get_error_message()
+                'message' => 'Employee not found.'
+            ], 404 );
+        }
+
+        $result = $this->employee_model->update( $id, $data );
+
+        if ( ! $result ) {
+            return new WP_REST_Response( [
+                'success' => false,
+                'message' => 'Failed to update employee.'
             ], 400 );
         }
 

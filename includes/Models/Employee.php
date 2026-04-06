@@ -1,248 +1,177 @@
 <?php
 namespace EmployeeManager\Models;
 
-use EmployeeManager\Database\Manager as DatabaseManager;
-
 class Employee {
 
-    private $db;
+    private $wpdb;
     private $table_name;
 
     public function __construct() {
         global $wpdb;
-        $this->db         = $wpdb;
-        $this->table_name = (new DatabaseManager())->get_table_name();
+        $this->wpdb = $wpdb;
+        $this->table_name = $wpdb->prefix . 'employee_manager';   // Fixed: Direct table name
     }
 
     /**
-     * Create new employee
+     * Get all employees with pagination and filtering
+     * 
+     * @param array|int $per_page Array of params or number of items per page (for backward compatibility)
+     * @param int $page Page number (ignored if first param is array)
      */
-    public function create( array $data ) {
-        $defaults = [
-            'full_name'        => '',
-            'email'            => '',
-            'phone'            => '',
-            'department'       => null,
-            'job_title'        => '',
-            'salary'           => null,
-            'date_joined'      => null,
-            'profile_photo_id' => 0,
-            'status'           => 'active'
+    public function get_all( $per_page = 20, $page = 1 ) {
+        $search = '';
+        $department = '';
+        $status = '';
+
+        // Handle array parameter (modern approach)
+        if ( is_array( $per_page ) ) {
+            $params = $per_page;
+            $per_page = (int) ( $params['per_page'] ?? 20 );
+            $page = (int) ( $params['page'] ?? 1 );
+            $search = sanitize_text_field( $params['search'] ?? '' );
+            $department = sanitize_text_field( $params['department'] ?? '' );
+            $status = sanitize_text_field( $params['status'] ?? '' );
+        } else {
+            // Handle individual parameters (backward compatibility)
+            $per_page = (int) $per_page;
+            $page = (int) $page;
+        }
+
+        $offset = ( $page - 1 ) * $per_page;
+        $where_clauses = [];
+        $where_values = [];
+
+        // Build WHERE clause for filters
+        if ( ! empty( $search ) ) {
+            $where_clauses[] = "(full_name LIKE %s OR email LIKE %s)";
+            $search_term = '%' . $this->wpdb->esc_like( $search ) . '%';
+            $where_values[] = $search_term;
+            $where_values[] = $search_term;
+        }
+
+        if ( ! empty( $department ) ) {
+            $where_clauses[] = "department = %s";
+            $where_values[] = $department;
+        }
+
+        if ( ! empty( $status ) ) {
+            $where_clauses[] = "status = %s";
+            $where_values[] = $status;
+        }
+
+        $where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
+
+        // Get results
+        $query = "SELECT * FROM {$this->table_name} {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+        $prepared_query = $this->wpdb->prepare( $query, array_merge( $where_values, [ $per_page, $offset ] ) );
+        $results = $this->wpdb->get_results( $prepared_query );
+
+        // Add profile photo URL for frontend
+        foreach ( $results as $employee ) {
+            if ( ! empty( $employee->profile_photo_id ) ) {
+                $employee->profile_photo_url = wp_get_attachment_url( $employee->profile_photo_id );
+            } else {
+                $employee->profile_photo_url = null;
+            }
+        }
+
+        // Get total count with filters
+        $count_query = "SELECT COUNT(*) FROM {$this->table_name} {$where_sql}";
+        $total = (int) $this->wpdb->get_var( $this->wpdb->prepare( $count_query, $where_values ) );
+
+        return [
+            'items'       => $results,
+            'total'       => $total,
+            'per_page'    => $per_page,
+            'page'        => $page,
+            'total_pages' => ceil( $total / $per_page )
         ];
-
-        $data = wp_parse_args( $data, $defaults );
-
-        // Validation
-        if ( empty( $data['full_name'] ) || empty( $data['email'] ) ) {
-            return new \WP_Error( 'missing_required', 'Full Name and Email are required.' );
-        }
-
-        if ( ! is_email( $data['email'] ) ) {
-            return new \WP_Error( 'invalid_email', 'Please provide a valid email address.' );
-        }
-
-        $insert_data = [
-            'full_name'        => sanitize_text_field( $data['full_name'] ),
-            'email'            => sanitize_email( $data['email'] ),
-            'phone'            => sanitize_text_field( $data['phone'] ),
-            'department'       => sanitize_text_field( $data['department'] ),
-            'job_title'        => sanitize_text_field( $data['job_title'] ),
-            'salary'           => is_numeric( $data['salary'] ) ? floatval( $data['salary'] ) : null,
-            'date_joined'      => ! empty( $data['date_joined'] ) ? sanitize_text_field( $data['date_joined'] ) : null,
-            'profile_photo_id' => absint( $data['profile_photo_id'] ),
-            'status'           => in_array( $data['status'], ['active', 'inactive'], true ) ? $data['status'] : 'active',
-        ];
-
-        $formats = [ '%s', '%s', '%s', '%s', '%s', '%f', '%s', '%d', '%s' ];
-
-        $result = $this->db->insert( $this->table_name, $insert_data, $formats );
-
-        if ( $result ) {
-            return $this->db->insert_id;
-        }
-
-        return new \WP_Error( 'insert_failed', 'Failed to create employee record.' );
     }
 
     /**
      * Get single employee by ID
      */
-    public function get_by_id( int $id ) {
-        $id = absint( $id );
-        $row = $this->db->get_row( $this->db->prepare(
+    public function get_by_id( $id ) {
+        $employee = $this->wpdb->get_row( $this->wpdb->prepare(
             "SELECT * FROM {$this->table_name} WHERE id = %d",
             $id
         ) );
 
-        if ( $row && $row->profile_photo_id ) {
-            $row->profile_photo_url = wp_get_attachment_url( $row->profile_photo_id );
+        if ( $employee && ! empty( $employee->profile_photo_id ) ) {
+            $employee->profile_photo_url = wp_get_attachment_url( $employee->profile_photo_id );
         }
 
-        return $row;
+        return $employee;
     }
 
     /**
-     * Get employees with search, filter, sort & pagination
+     * Create new employee
      */
-    public function get_all( array $args = [] ) {
-        $defaults = [
-            'per_page'   => 20,
-            'page'       => 1,
-            'search'     => '',
-            'department' => '',
-            'status'     => '',
-            'orderby'    => 'id',
-            'order'      => 'DESC'
-        ];
+    public function create( $data ) {
+        $result = $this->wpdb->insert( $this->table_name, [
+            'full_name'       => sanitize_text_field( $data['full_name'] ?? '' ),
+            'email'           => sanitize_email( $data['email'] ?? '' ),
+            'phone'           => sanitize_text_field( $data['phone'] ?? '' ),
+            'department'      => sanitize_text_field( $data['department'] ?? null ),
+            'job_title'       => sanitize_text_field( $data['job_title'] ?? '' ),
+            'salary'          => isset( $data['salary'] ) ? floatval( $data['salary'] ) : null,
+            'date_joined'     => sanitize_text_field( $data['date_joined'] ?? null ),
+            'profile_photo_id'=> isset( $data['profile_photo_id'] ) ? intval( $data['profile_photo_id'] ) : null,
+            'status'          => sanitize_text_field( $data['status'] ?? 'active' ),
+        ] );
 
-        $args   = wp_parse_args( $args, $defaults );
-        $offset = ( $args['page'] - 1 ) * $args['per_page'];
-
-        $where  = [];
-        $params = [];
-
-        if ( ! empty( $args['search'] ) ) {
-            $search = '%' . $this->db->esc_like( $args['search'] ) . '%';
-            $where[] = "(full_name LIKE %s OR email LIKE %s)";
-            $params[] = $search;
-            $params[] = $search;
-        }
-
-        if ( ! empty( $args['department'] ) ) {
-            $where[] = "department = %s";
-            $params[] = sanitize_text_field( $args['department'] );
-        }
-
-        if ( ! empty( $args['status'] ) ) {
-            $where[] = "status = %s";
-            $params[] = sanitize_text_field( $args['status'] );
-        }
-
-        $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
-
-        // Get total count
-        $count_sql = "SELECT COUNT(*) FROM {$this->table_name} {$where_sql}";
-        $total     = $this->db->get_var( ! empty( $params ) ? $this->db->prepare( $count_sql, $params ) : $count_sql );
-
-        // Main query
-        $sql = "SELECT * FROM {$this->table_name} {$where_sql}
-                ORDER BY {$args['orderby']} {$args['order']}
-                LIMIT %d OFFSET %d";
-
-        $query_params   = $params;
-        $query_params[] = absint( $args['per_page'] );
-        $query_params[] = absint( $offset );
-
-        $results = $this->db->get_results( $this->db->prepare( $sql, $query_params ) );
-
-        // Add full image URL for each employee
-        foreach ( $results as $row ) {
-            if ( ! empty( $row->profile_photo_id ) ) {
-                $row->profile_photo_url = wp_get_attachment_url( $row->profile_photo_id );
-            } else {
-                $row->profile_photo_url = null;
-            }
-        }
-
-        return [
-            'items'       => $results ?: [],
-            'total'       => (int) $total,
-            'per_page'    => (int) $args['per_page'],
-            'page'        => (int) $args['page'],
-            'total_pages' => $total > 0 ? ceil( $total / $args['per_page'] ) : 0,
-        ];
+        return $result ? $this->wpdb->insert_id : false;
     }
 
     /**
      * Update employee
      */
-    public function update( int $id, array $data ) {
-        $id = absint( $id );
+    public function update( $id, $data ) {
+        $result = $this->wpdb->update( $this->table_name, [
+            'full_name'       => sanitize_text_field( $data['full_name'] ?? '' ),
+            'email'           => sanitize_email( $data['email'] ?? '' ),
+            'phone'           => sanitize_text_field( $data['phone'] ?? '' ),
+            'department'      => sanitize_text_field( $data['department'] ?? null ),
+            'job_title'       => sanitize_text_field( $data['job_title'] ?? '' ),
+            'salary'          => isset( $data['salary'] ) ? floatval( $data['salary'] ) : null,
+            'date_joined'     => sanitize_text_field( $data['date_joined'] ?? null ),
+            'profile_photo_id'=> isset( $data['profile_photo_id'] ) ? intval( $data['profile_photo_id'] ) : null,
+            'status'          => sanitize_text_field( $data['status'] ?? 'active' ),
+        ], [ 'id' => $id ] );
 
-        $update_data = [];
-        $formats     = [];
-
-        $allowed = ['full_name', 'email', 'phone', 'department', 'job_title', 'salary', 'date_joined', 'profile_photo_id', 'status'];
-
-        foreach ( $allowed as $field ) {
-            if ( isset( $data[$field] ) ) {
-                switch ( $field ) {
-                    case 'email':
-                        if ( ! is_email( $data[$field] ) ) {
-                            return new \WP_Error( 'invalid_email', 'Invalid email address.' );
-                        }
-                        $update_data[$field] = sanitize_email( $data[$field] );
-                        $formats[] = '%s';
-                        break;
-
-                    case 'salary':
-                        $update_data[$field] = is_numeric( $data[$field] ) ? floatval( $data[$field] ) : null;
-                        $formats[] = '%f';
-                        break;
-
-                    case 'profile_photo_id':
-                        $update_data[$field] = absint( $data[$field] );
-                        $formats[] = '%d';
-                        break;
-
-                    case 'status':
-                        $status = $data[$field];
-                        $update_data[$field] = in_array( $status, ['active', 'inactive'] ) ? $status : 'active';
-                        $formats[] = '%s';
-                        break;
-
-                    default:
-                        $update_data[$field] = sanitize_text_field( $data[$field] );
-                        $formats[] = '%s';
-                }
-            }
-        }
-
-        if ( empty( $update_data ) ) {
-            return new \WP_Error( 'no_data', 'No data provided to update.' );
-        }
-
-        $result = $this->db->update(
-            $this->table_name,
-            $update_data,
-            ['id' => $id],
-            $formats,
-            ['%d']
-        );
-
-        return $result !== false ? true : new \WP_Error( 'update_failed', 'Failed to update employee.' );
+        return $result !== false;
     }
 
     /**
-     * Delete single employee
+     * Delete employee
      */
-    public function delete( int $id ) {
-        $id = absint( $id );
-        return (bool) $this->db->delete( $this->table_name, ['id' => $id], ['%d'] );
+    public function delete( $id ) {
+        return $this->wpdb->delete( $this->table_name, [ 'id' => $id ] );
     }
 
     /**
-     * Bulk actions (delete or change status)
+     * Bulk actions (delete or status change)
      */
-    public function bulk_action( array $ids, string $action, string $value = null ) {
-        $ids = array_map( 'absint', $ids );
-        $success = true;
+    public function bulk_action( $ids, $action, $status = null ) {
+        if ( empty( $ids ) ) {
+            return false;
+        }
 
         if ( $action === 'delete' ) {
-            foreach ( $ids as $id ) {
-                if ( ! $this->delete( $id ) ) {
-                    $success = false;
-                }
-            }
-        } elseif ( $action === 'status' && in_array( $value, ['active', 'inactive'] ) ) {
-            foreach ( $ids as $id ) {
-                if ( ! $this->update( $id, ['status' => $value] ) ) {
-                    $success = false;
-                }
-            }
+            $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+            return $this->wpdb->query( $this->wpdb->prepare(
+                "DELETE FROM {$this->table_name} WHERE id IN ($placeholders)",
+                $ids
+            ) );
+        } elseif ( $action === 'status' && $status ) {
+            $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+            return $this->wpdb->query( $this->wpdb->prepare(
+                "UPDATE {$this->table_name} SET status = %s WHERE id IN ($placeholders)",
+                $status,
+                $ids
+            ) );
         }
 
-        return $success;
+        return false;
     }
-
 }
