@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, CheckboxControl } from '@wordpress/components';
+import { details, pencil, trash } from '@wordpress/icons';
 import { Employee } from '../types';
 
 interface EmployeeTableProps {
@@ -122,33 +123,53 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                             </span>
                         </td>
                         <td style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>
-                            <Button 
-                                variant="secondary" 
-                                onClick={() => onView(emp)} 
-                                style={{ marginRight: '8px' }}
-                            >
-                                View
-                            </Button>
-
-                            {canManage && onEdit && (
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
                                 <Button 
-                                    variant="secondary" 
-                                    onClick={() => onEdit(emp)} 
-                                    style={{ marginRight: '8px' }}
-                                >
-                                    Edit
-                                </Button>
-                            )}
+                                    icon={details}
+                                    onClick={() => onView(emp)}
+                                    title="View"
+                                    style={{ 
+                                        padding: '2px',
+                                        cursor: 'pointer',
+                                        color: '#0073aa',
+                                        minWidth: 'auto',
+                                        height: '28px',
+                                        width: '28px'
+                                    }}
+                                />
 
-                            {canManage && onDelete && (
-                                <Button 
-                                    variant="secondary" 
-                                    isDestructive 
-                                    onClick={() => onDelete(emp)}
-                                >
-                                    Delete
-                                </Button>
-                            )}
+                                {canManage && onEdit && (
+                                    <Button 
+                                        icon={pencil}
+                                        onClick={() => onEdit(emp)}
+                                        title="Edit"
+                                        style={{ 
+                                            padding: '2px',
+                                            cursor: 'pointer',
+                                            color: '#0073aa',
+                                            minWidth: 'auto',
+                                            height: '28px',
+                                            width: '28px'
+                                        }}
+                                    />
+                                )}
+
+                                {canManage && onDelete && (
+                                    <Button 
+                                        icon={trash}
+                                        isDestructive 
+                                        onClick={() => onDelete(emp)}
+                                        title="Delete"
+                                        style={{ 
+                                            padding: '2px',
+                                            cursor: 'pointer',
+                                            minWidth: 'auto',
+                                            height: '28px',
+                                            width: '28px'
+                                        }}
+                                    />
+                                )}
+                            </div>
                         </td>
                     </tr>
                 ))}
