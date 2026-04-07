@@ -266,113 +266,177 @@ const EmployeeManagerApp: React.FC = () => {
         <ThemeProvider pluginId="employee-manager">
             <div style={{ padding: '20px' }}>
                 <Card>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h1 style={{ margin: 0 }}>Employee Manager</h1>
-                        {canManage && (
-                            <Button variant="primary" onClick={() => openModal()}>
-                                + Add New Employee
-                            </Button>
-                        )}
-                    </div>
+                    {canManage ? (
+                        // HR Manager / Admin Layout
+                        <>
+                            {/* Row 1: Add New Employee and Search */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <Button variant="primary" onClick={() => openModal()}>
+                                    + Add New Employee
+                                </Button>
+                                <TextControl
+                                    placeholder="Search by name or email"
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
+                                    style={{ width: '300px' }}
+                                />
+                            </div>
 
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                        <TextControl
-                            placeholder="Search by name or email"
-                            value={searchTerm}
-                            onChange={setSearchTerm}
-                            style={{ width: '300px' }}
-                        />
-                        <SelectControl
-                            label="Department"
-                            value={filterDepartment}
-                            options={[
-                                { label: 'All Departments', value: '' },
-                                { label: 'HR', value: 'HR' },
-                                { label: 'Engineering', value: 'Engineering' },
-                                { label: 'Marketing', value: 'Marketing' },
-                                { label: 'Sales', value: 'Sales' },
-                                { label: 'Finance', value: 'Finance' },
-                                { label: 'Operations', value: 'Operations' },
-                                { label: 'Other', value: 'Other' },
-                            ]}
-                            onChange={setFilterDepartment}
-                        />
-                        <SelectControl
-                            label="Status"
-                            value={filterStatus}
-                            options={[
-                                { label: 'All Status', value: '' },
-                                { label: 'Active', value: 'active' },
-                                { label: 'Inactive', value: 'inactive' },
-                            ]}
-                            onChange={setFilterStatus}
-                        />
-                    </div>
-
-                    {/* Bulk Actions Row - WordPress Style */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <SelectControl
-                                label=""
-                                value={bulkAction}
-                                options={[
-                                    { label: 'Bulk Actions', value: '' },
-                                    { label: '→ Mark as Active', value: 'active' },
-                                    { label: '→ Mark as Inactive', value: 'inactive' },
-                                    { label: '→ Delete', value: 'delete' },
-                                ]}
-                                onChange={setBulkAction}
-                                disabled={selectedIds.length === 0 || !canManage}
-                                style={{ minWidth: '200px' }}
-                            />
-                            <Button 
-                                variant="primary"
-                                onClick={applyBulkAction}
-                                disabled={!bulkAction || selectedIds.length === 0 || !canManage}
-                                style={{ color: 'white' }}
-                            >
-                                Apply
-                            </Button>
-                            {selectedIds.length > 0 && (
-                                <span style={{ 
-                                    background: '#0073aa', 
-                                    color: 'white', 
-                                    padding: '4px 12px', 
-                                    borderRadius: '12px', 
-                                    fontSize: '13px',
-                                    fontWeight: '500'
-                                }}>
-                                    {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Member Count Display - Right Side */}
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            {hasActiveFilters ? (
-                                <>
-                                    <span style={{ fontSize: '13px', color: '#555' }}>
-                                        Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
-                                    </span>
+                            {/* Row 2: Bulk Actions and Filters */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '15px', flexWrap: 'wrap', gap: '12px' }}>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                                    <SelectControl
+                                        label=""
+                                        value={bulkAction}
+                                        options={[
+                                            { label: 'Bulk Actions', value: '' },
+                                            { label: '→ Mark as Active', value: 'active' },
+                                            { label: '→ Mark as Inactive', value: 'inactive' },
+                                            { label: '→ Delete', value: 'delete' },
+                                        ]}
+                                        onChange={setBulkAction}
+                                        disabled={selectedIds.length === 0 || !canManage}
+                                        style={{ minWidth: '180px' }}
+                                    />
                                     <Button 
-                                        variant="tertiary"
-                                        onClick={() => {
-                                            setSearchTerm('');
-                                            setFilterDepartment('');
-                                            setFilterStatus('');
-                                        }}
-                                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        variant="primary"
+                                        onClick={applyBulkAction}
+                                        disabled={!bulkAction || selectedIds.length === 0 || !canManage}
+                                        style={{ color: 'white' }}
                                     >
-                                        Clear
+                                        Apply
                                     </Button>
-                                </>
-                            ) : (
-                                <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
-                                    Total: <strong>{totalItems}</strong>
-                                </span>
-                            )}
+                                    {selectedIds.length > 0 && (
+                                        <span style={{ 
+                                            background: '#0073aa', 
+                                            color: 'white', 
+                                            padding: '4px 12px', 
+                                            borderRadius: '12px', 
+                                            fontSize: '13px',
+                                            fontWeight: '500'
+                                        }}>
+                                            {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+                                        </span>
+                                    )}
+                                    
+                                    <SelectControl
+                                        label="Department"
+                                        value={filterDepartment}
+                                        options={[
+                                            { label: 'All Departments', value: '' },
+                                            { label: 'HR', value: 'HR' },
+                                            { label: 'Engineering', value: 'Engineering' },
+                                            { label: 'Marketing', value: 'Marketing' },
+                                            { label: 'Sales', value: 'Sales' },
+                                            { label: 'Finance', value: 'Finance' },
+                                            { label: 'Operations', value: 'Operations' },
+                                            { label: 'Other', value: 'Other' },
+                                        ]}
+                                        onChange={setFilterDepartment}
+                                    />
+                                    <SelectControl
+                                        label="Status"
+                                        value={filterStatus}
+                                        options={[
+                                            { label: 'All Status', value: '' },
+                                            { label: 'Active', value: 'active' },
+                                            { label: 'Inactive', value: 'inactive' },
+                                        ]}
+                                        onChange={setFilterStatus}
+                                    />
+                                </div>
+
+                                {/* Member Count Display - Right Side */}
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    {hasActiveFilters ? (
+                                        <>
+                                            <span style={{ fontSize: '13px', color: '#555' }}>
+                                                Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
+                                            </span>
+                                            <Button 
+                                                variant="tertiary"
+                                                onClick={() => {
+                                                    setSearchTerm('');
+                                                    setFilterDepartment('');
+                                                    setFilterStatus('');
+                                                }}
+                                                style={{ padding: '2px 8px', fontSize: '11px' }}
+                                            >
+                                                Clear
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
+                                            Total: <strong>{totalItems}</strong>
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        // Employee Viewer Layout - All controls in one row
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '15px', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'nowrap', minWidth: 0 }}>
+                                <SelectControl
+                                    label="Department"
+                                    value={filterDepartment}
+                                    options={[
+                                        { label: 'All Departments', value: '' },
+                                        { label: 'HR', value: 'HR' },
+                                        { label: 'Engineering', value: 'Engineering' },
+                                        { label: 'Marketing', value: 'Marketing' },
+                                        { label: 'Sales', value: 'Sales' },
+                                        { label: 'Finance', value: 'Finance' },
+                                        { label: 'Operations', value: 'Operations' },
+                                        { label: 'Other', value: 'Other' },
+                                    ]}
+                                    onChange={setFilterDepartment}
+                                />
+                                <SelectControl
+                                    label="Status"
+                                    value={filterStatus}
+                                    options={[
+                                        { label: 'All Status', value: '' },
+                                        { label: 'Active', value: 'active' },
+                                        { label: 'Inactive', value: 'inactive' },
+                                    ]}
+                                    onChange={setFilterStatus}
+                                />
+                                <TextControl
+                                    placeholder="Search by name or email"
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
+                                    style={{ width: '200px', flexShrink: 0 }}
+                                />
+                            </div>
+
+                            {/* Member Count Display - Right Side */}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {hasActiveFilters ? (
+                                    <>
+                                        <span style={{ fontSize: '13px', color: '#555' }}>
+                                            Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
+                                        </span>
+                                        <Button 
+                                            variant="tertiary"
+                                            onClick={() => {
+                                                setSearchTerm('');
+                                                setFilterDepartment('');
+                                                setFilterStatus('');
+                                            }}
+                                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        >
+                                            Clear
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
+                                        Total: <strong>{totalItems}</strong>
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {error && <Notice status="error" isDismissible onDismiss={() => setError(null)}>{error}</Notice>}
                     {schemaError && <Notice status="error" isDismissible>{schemaError}</Notice>}

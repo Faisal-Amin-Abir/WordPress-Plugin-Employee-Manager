@@ -82,6 +82,9 @@ class Plugin {
         // Update existing HR Manager role with new capabilities if needed
         self::update_existing_roles();
 
+        // Grant capabilities to Administrator role
+        Capabilities::grant_capabilities_to_admin();
+
         // Register media permissions for HR Manager role
         Capabilities::register_media_permissions();
 

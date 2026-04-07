@@ -58,6 +58,9 @@ class Capabilities {
         } else {
             error_log( 'Employee Manager: Employee Viewer role already exists' );
         }
+
+        // Grant HR Manager capabilities to Administrator
+        self::grant_capabilities_to_admin();
     }
 
     /**
@@ -157,5 +160,39 @@ class Capabilities {
         }
         
         return $where;
+    }
+
+    /**
+     * Grant HR Manager capabilities to Administrator role
+     */
+    public static function grant_capabilities_to_admin() {
+        $admin_role = get_role( 'administrator' );
+        
+        if ( $admin_role ) {
+            // Grant custom capabilities
+            $admin_role->add_cap( self::MANAGE_EMPLOYEES );
+            $admin_role->add_cap( self::VIEW_EMPLOYEES );
+            
+            // Grant media-related capabilities if not already present
+            if ( ! $admin_role->has_cap( 'upload_files' ) ) {
+                $admin_role->add_cap( 'upload_files' );
+            }
+            if ( ! $admin_role->has_cap( 'edit_posts' ) ) {
+                $admin_role->add_cap( 'edit_posts' );
+            }
+            if ( ! $admin_role->has_cap( 'read_private_posts' ) ) {
+                $admin_role->add_cap( 'read_private_posts' );
+            }
+            if ( ! $admin_role->has_cap( 'edit_private_posts' ) ) {
+                $admin_role->add_cap( 'edit_private_posts' );
+            }
+            if ( ! $admin_role->has_cap( 'delete_posts' ) ) {
+                $admin_role->add_cap( 'delete_posts' );
+            }
+            
+            error_log( 'Employee Manager: Capabilities granted to Administrator role' );
+        } else {
+            error_log( 'Employee Manager: Administrator role not found' );
+        }
     }
 }
