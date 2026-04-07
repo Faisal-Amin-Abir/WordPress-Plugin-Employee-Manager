@@ -161,14 +161,14 @@ class Employee {
             $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
             return $this->wpdb->query( $this->wpdb->prepare(
                 "DELETE FROM {$this->table_name} WHERE id IN ($placeholders)",
-                $ids
+                ...$ids
             ) );
         } elseif ( $action === 'status' && $status ) {
             $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+            $prepare_args = array_merge( [ $status ], $ids );
             return $this->wpdb->query( $this->wpdb->prepare(
                 "UPDATE {$this->table_name} SET status = %s WHERE id IN ($placeholders)",
-                $status,
-                $ids
+                ...$prepare_args
             ) );
         }
 

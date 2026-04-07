@@ -9,11 +9,16 @@ import { ThemeProvider, Card } from '@wedevs/plugin-ui';
 import apiFetch from '@wordpress/api-fetch';
 
 import EmployeeTable from './EmployeeTable';
-import EmployeeFormModal from './EmployeeFormModal';
+import { DynamicFormModal } from './DynamicForm';
 import EmployeeViewModal from './EmployeeViewModal';
 import { Employee } from '../types';
+import { useSchema } from '../hooks/useSchema';
+import { generateInitialFormData, generateFormDataFromRecord } from '../utils/formInitialize';
 
 const EmployeeManagerApp: React.FC = () => {
+    // Fetch schema for dynamic form rendering
+    const { schema, editableSchema, isLoading: schemaLoading, error: schemaError } = useSchema();
+
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -23,6 +28,7 @@ const EmployeeManagerApp: React.FC = () => {
     const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
     const [maxUploadMB, setMaxUploadMB] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
+    const [currentMediaField, setCurrentMediaField] = useState<string | null>(null);
 
     const permissions = (window as any).employeeManager || {};
     const canManage = permissions.canManage || false;
@@ -32,28 +38,30 @@ const EmployeeManagerApp: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState('');
 
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [bulkAction, setBulkAction] = useState<string>('');
 
-    const [formData, setFormData] = useState<Employee>({
-        full_name: '',
-        email: '',
-        phone: '',
-        department: 'HR',
-        job_title: '',
-        salary: undefined,
-        date_joined: '',
-        profile_photo_id: undefined,
-        status: 'active',
-    });
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
 
-    const fetchData = useCallback(async () => {
+    // Initialize form data from schema
+    const [formData, setFormData] = useState<any>(() => generateInitialFormData(schema));
+
+    const fetchData = useCallback(async (page: number = 1, itemsPerPage: number = perPage) => {
         try {
             setIsLoading(true);
             setError(null);
 
             const empResponse = await apiFetch({
-                path: 'employee-manager/v1/employees?per_page=100',
+                path: `employee-manager/v1/employees?page=${page}&per_page=${itemsPerPage}`,
             }) as any;
+            
             setEmployees(empResponse.data || []);
+            setCurrentPage(empResponse.page || 1);
+            setTotalPages(empResponse.pages || 1);
+            setTotalItems((empResponse.pages || 1) * itemsPerPage);
 
             // Fetch settings from custom endpoint (allows both admins and managers)
             try {
@@ -80,11 +88,11 @@ const EmployeeManagerApp: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [perPage]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        fetchData(currentPage, perPage);
+    }, [fetchData, currentPage, perPage]);
 
     const filteredEmployees = employees.filter(emp => {
         const matchesSearch = !searchTerm || 
@@ -102,20 +110,10 @@ const EmployeeManagerApp: React.FC = () => {
 
         if (employee) {
             setEditingEmployee(employee);
-            setFormData({ ...employee });
+            setFormData(generateFormDataFromRecord(employee, schema));
         } else {
             setEditingEmployee(null);
-            setFormData({
-                full_name: '',
-                email: '',
-                phone: '',
-                department: 'HR',
-                job_title: '',
-                salary: undefined,
-                date_joined: '',
-                profile_photo_id: undefined,
-                status: 'active',
-            });
+            setFormData(generateInitialFormData(schema));
         }
         setIsModalOpen(true);
     };
@@ -147,7 +145,7 @@ const EmployeeManagerApp: React.FC = () => {
             }
 
             setIsModalOpen(false);
-            fetchData();
+            fetchData(currentPage, perPage);
         } catch (err: any) {
             alert('Error: ' + (err.message || 'Failed to save employee'));
         } finally {
@@ -155,19 +153,19 @@ const EmployeeManagerApp: React.FC = () => {
         }
     };
 
-    const openMediaLibrary = () => {
+    const openMediaLibrary = (fieldName: string = 'profile_photo_id') => {
         const frame = (window as any).wp.media({
-            title: 'Select Profile Photo',
-            button: { text: 'Use this photo' },
+            title: `Select File for ${schema?.[fieldName]?.label || 'Upload'}`,
+            button: { text: 'Use this file' },
             multiple: false,
             library: { type: 'image' }
         });
 
         frame.on('select', () => {
             const attachment = frame.state().get('selection').first().toJSON();
-            setFormData(prev => ({
+            setFormData((prev: any) => ({
                 ...prev,
-                profile_photo_id: attachment.id
+                [fieldName]: attachment.id
             }));
         });
 
@@ -191,7 +189,9 @@ const EmployeeManagerApp: React.FC = () => {
                 data: { action: 'delete', ids: selectedIds }
             });
             setSelectedIds([]);
-            fetchData();
+            // Reset to page 1 after bulk delete
+            setCurrentPage(1);
+            fetchData(1, perPage);
         } catch (err: any) {
             alert('Bulk delete failed');
         }
@@ -207,10 +207,27 @@ const EmployeeManagerApp: React.FC = () => {
                 data: { action: 'status', ids: selectedIds, status: newStatus }
             });
             setSelectedIds([]);
-            fetchData();
+            setBulkAction('');
+            fetchData(currentPage, perPage);
         } catch (err: any) {
             alert('Bulk status change failed');
         }
+    };
+
+    const applyBulkAction = async () => {
+        if (!bulkAction || selectedIds.length === 0) return;
+
+        if (bulkAction === 'delete') {
+            if (!confirm(`Delete ${selectedIds.length} selected employees?`)) return;
+            await bulkDelete();
+        } else if (bulkAction === 'active') {
+            await bulkChangeStatus('active');
+        } else if (bulkAction === 'inactive') {
+            await bulkChangeStatus('inactive');
+        }
+
+        // Reset dropdown after action
+        setBulkAction('');
     };
 
     return (
@@ -260,58 +277,162 @@ const EmployeeManagerApp: React.FC = () => {
                         />
                     </div>
 
-                    {selectedIds.length > 0 && canManage && (
-                        <div style={{ marginBottom: '15px', padding: '10px', background: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '4px' }}>
-                            <strong>{selectedIds.length} selected</strong>
-                            <Button variant="secondary" onClick={bulkDelete} style={{ marginLeft: '15px' }}>
-                                Delete Selected
-                            </Button>
-                            <Button variant="secondary" onClick={() => bulkChangeStatus('active')} style={{ marginLeft: '8px' }}>
-                                Mark as Active
-                            </Button>
-                            <Button variant="secondary" onClick={() => bulkChangeStatus('inactive')} style={{ marginLeft: '8px' }}>
-                                Mark as Inactive
-                            </Button>
-                        </div>
-                    )}
+                    {/* Bulk Actions Row - WordPress Style */}
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <SelectControl
+                            label=""
+                            value={bulkAction}
+                            options={[
+                                { label: 'Bulk Actions', value: '' },
+                                { label: '→ Mark as Active', value: 'active' },
+                                { label: '→ Mark as Inactive', value: 'inactive' },
+                                { label: '→ Delete', value: 'delete' },
+                            ]}
+                            onChange={setBulkAction}
+                            disabled={selectedIds.length === 0 || !canManage}
+                            style={{ minWidth: '200px' }}
+                        />
+                        <Button 
+                            variant="primary"
+                            onClick={applyBulkAction}
+                            disabled={!bulkAction || selectedIds.length === 0 || !canManage}
+                            style={{ color: 'white' }}
+                        >
+                            Apply
+                        </Button>
+                        {selectedIds.length > 0 && (
+                            <span style={{ 
+                                background: '#0073aa', 
+                                color: 'white', 
+                                padding: '4px 12px', 
+                                borderRadius: '12px', 
+                                fontSize: '13px',
+                                fontWeight: '500'
+                            }}>
+                                {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+                            </span>
+                        )}
+                    </div>
 
                     {error && <Notice status="error" isDismissible onDismiss={() => setError(null)}>{error}</Notice>}
+                    {schemaError && <Notice status="error" isDismissible>{schemaError}</Notice>}
 
                     {isLoading ? (
                         <p>Loading employees...</p>
                     ) : filteredEmployees.length === 0 ? (
                         <p>No employees found.</p>
                     ) : (
-                        <EmployeeTable
-                            filteredEmployees={filteredEmployees}
-                            selectedIds={selectedIds}
-                            onToggleSelect={toggleSelect}
-                            onSelectAll={(checked) => setSelectedIds(checked ? filteredEmployees.map(e => e.id!) : [])}
-                            onEdit={canManage ? openModal : undefined}
-                            onView={openViewModal}
-                            onDelete={canManage ? (emp) => {
-                                if (confirm(`Delete ${emp.full_name}?`)) {
-                                    apiFetch({
-                                        path: `employee-manager/v1/employees/${emp.id}`,
-                                        method: 'DELETE',
-                                    }).then(() => fetchData());
-                                }
-                            } : undefined}
-                            canManage={canManage}
-                        />
+                        <>
+                            <EmployeeTable
+                                filteredEmployees={filteredEmployees}
+                                selectedIds={selectedIds}
+                                onToggleSelect={toggleSelect}
+                                onSelectAll={(checked) => setSelectedIds(checked ? filteredEmployees.map(e => e.id!) : [])}
+                                onEdit={canManage ? openModal : undefined}
+                                onView={openViewModal}
+                                onDelete={canManage ? (emp) => {
+                                    if (confirm(`Delete ${emp.full_name}?`)) {
+                                        apiFetch({
+                                            path: `employee-manager/v1/employees/${emp.id}`,
+                                            method: 'DELETE',
+                                        }).then(() => fetchData(currentPage, perPage));
+                                    }
+                                } : undefined}
+                                canManage={canManage}
+                            />
+                            
+                            {/* Pagination Controls */}
+                            <div style={{ 
+                                display: 'flex', 
+                                gap: '12px', 
+                                marginTop: '20px', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                padding: '15px',
+                                background: '#f9f9f9',
+                                borderRadius: '4px',
+                                border: '1px solid #e5e5e5'
+                            }}>
+                                <div style={{ fontSize: '13px', color: '#666' }}>
+                                    <strong>Items per page:</strong>
+                                </div>
+                                <SelectControl
+                                    value={perPage.toString()}
+                                    options={[
+                                        { label: '5 items', value: '5' },
+                                        { label: '10 items', value: '10' },
+                                        { label: '25 items', value: '25' },
+                                        { label: '50 items', value: '50' },
+                                    ]}
+                                    onChange={(val) => {
+                                        const newPerPage = parseInt(val);
+                                        setPerPage(newPerPage);
+                                        setCurrentPage(1);
+                                        fetchData(1, newPerPage);
+                                    }}
+                                    style={{ minWidth: '120px' }}
+                                />
+                                
+                                <div style={{ 
+                                    fontSize: '13px', 
+                                    color: '#666',
+                                    marginLeft: 'auto'
+                                }}>
+                                    Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <Button
+                                        onClick={() => fetchData(1, perPage)}
+                                        disabled={currentPage === 1 || isLoading}
+                                        variant="secondary"
+                                    >
+                                        « First
+                                    </Button>
+                                    <Button
+                                        onClick={() => fetchData(currentPage - 1, perPage)}
+                                        disabled={currentPage === 1 || isLoading}
+                                        variant="secondary"
+                                    >
+                                        ‹ Previous
+                                    </Button>
+                                    <Button
+                                        onClick={() => fetchData(currentPage + 1, perPage)}
+                                        disabled={currentPage >= totalPages || isLoading}
+                                        variant="secondary"
+                                    >
+                                        Next ›
+                                    </Button>
+                                    <Button
+                                        onClick={() => fetchData(totalPages, perPage)}
+                                        disabled={currentPage >= totalPages || isLoading}
+                                        variant="secondary"
+                                    >
+                                        Last »
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </Card>
 
-                <EmployeeFormModal
+                <DynamicFormModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     onSubmit={handleSubmit}
                     formData={formData}
                     onFormChange={setFormData}
-                    maxUploadMB={maxUploadMB}
-                    onMediaUpload={openMediaLibrary}
+                    schema={editableSchema}
+                    isLoading={schemaLoading}
                     isSaving={isSaving}
-                    editingEmployee={editingEmployee}
+                    editingRecord={editingEmployee}
+                    onMediaUpload={(fieldName) => {
+                        setCurrentMediaField(fieldName);
+                        openMediaLibrary(fieldName);
+                    }}
+                    maxUploadMB={maxUploadMB}
+                    title="Add New Employee"
                 />
 
                 <EmployeeViewModal

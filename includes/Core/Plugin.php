@@ -7,6 +7,7 @@ class Plugin {
     private static $instance = null;
     public $db_manager;
     public $rest_api;
+    public $schema;
     public $admin;
     public $settings;
 
@@ -64,9 +65,41 @@ class Plugin {
     public function load_components() {
         $this->db_manager = new DatabaseManager();
         $this->rest_api   = new \EmployeeManager\API\RestController();
+        $this->schema     = new \EmployeeManager\API\SchemaController();
         $this->admin      = new \EmployeeManager\Admin\EmployeeAdmin();
         $this->settings   = new \EmployeeManager\Settings\Settings();   
 
+        // Update existing HR Manager role with new capabilities if needed
+        self::update_existing_roles();
+
+        // Register media permissions for HR Manager role
+        Capabilities::register_media_permissions();
+
         error_log( 'Employee Manager: Plugin components loaded' );
+    }
+
+    /**
+     * Update existing HR Manager role with new media capabilities
+     */
+    public static function update_existing_roles() {
+        $hr_manager_role = get_role( 'hr_manager' );
+        
+        if ( $hr_manager_role ) {
+            // Add media capabilities if they don't exist
+            $required_caps = [
+                'upload_files',
+                'edit_posts',
+                'read_private_posts',
+                'edit_private_posts',
+                'delete_posts',
+            ];
+            
+            foreach ( $required_caps as $cap ) {
+                if ( ! $hr_manager_role->has_cap( $cap ) ) {
+                    $hr_manager_role->add_cap( $cap );
+                    error_log( "Employee Manager: Added '$cap' capability to hr_manager role" );
+                }
+            }
+        }
     }
 }
