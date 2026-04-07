@@ -14,8 +14,8 @@ class Capabilities {
      */
     public static function create_roles() {
         // HR Manager - Full access
-        if (!get_role('hr_manager')) {
-            add_role(
+        if ( ! get_role( 'hr_manager' ) ) {
+            $role = add_role(
                 'hr_manager',
                 'HR Manager',
                 [
@@ -29,11 +29,19 @@ class Capabilities {
                     'delete_posts'          => true,
                 ]
             );
+            
+            if ( $role ) {
+                error_log( 'Employee Manager: HR Manager role created successfully' );
+            } else {
+                error_log( 'Employee Manager: Failed to create HR Manager role' );
+            }
+        } else {
+            error_log( 'Employee Manager: HR Manager role already exists' );
         }
 
         // Employee Viewer - View only
-        if (!get_role('employee_viewer')) {
-            add_role(
+        if ( ! get_role( 'employee_viewer' ) ) {
+            $role = add_role(
                 'employee_viewer',
                 'Employee Viewer',
                 [
@@ -41,15 +49,41 @@ class Capabilities {
                     'read'               => true,
                 ]
             );
+            
+            if ( $role ) {
+                error_log( 'Employee Manager: Employee Viewer role created successfully' );
+            } else {
+                error_log( 'Employee Manager: Failed to create Employee Viewer role' );
+            }
+        } else {
+            error_log( 'Employee Manager: Employee Viewer role already exists' );
         }
     }
 
     /**
-     * Remove roles on plugin deactivation (optional)
+     * Remove roles on plugin deactivation
+     * This ensures users with these roles cannot access WordPress while plugin is deactivated
      */
     public static function remove_roles() {
-        remove_role('hr_manager');
-        remove_role('employee_viewer');
+        error_log( 'Employee Manager: Attempting to remove custom roles...' );
+        
+        // Remove HR Manager role
+        if ( get_role( 'hr_manager' ) ) {
+            remove_role( 'hr_manager' );
+            error_log( 'Employee Manager: HR Manager role removed' );
+        } else {
+            error_log( 'Employee Manager: HR Manager role not found (already removed)' );
+        }
+        
+        // Remove Employee Viewer role
+        if ( get_role( 'employee_viewer' ) ) {
+            remove_role( 'employee_viewer' );
+            error_log( 'Employee Manager: Employee Viewer role removed' );
+        } else {
+            error_log( 'Employee Manager: Employee Viewer role not found (already removed)' );
+        }
+        
+        error_log( 'Employee Manager: Role removal process completed' );
     }
 
     /**

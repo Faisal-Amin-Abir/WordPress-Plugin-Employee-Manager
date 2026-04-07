@@ -41,14 +41,12 @@ class Plugin {
         error_log( '→ Database table creation completed.' );
 
         // Create custom roles
-        error_log( '→ Loading Capabilities class...' );
-        
-        if ( class_exists( '\\EmployeeManager\\Core\\Capabilities' ) ) {
-            error_log( 'Capabilities class found. Creating roles...' );
-            \EmployeeManager\Core\Capabilities::create_roles();
-            error_log( 'Roles creation completed.' );
-        } else {
-            error_log( 'ERROR: Capabilities class NOT found during activation!' );
+        error_log( '→ Creating custom roles...' );
+        try {
+            Capabilities::create_roles();
+            error_log( '✓ Custom roles created successfully.' );
+        } catch ( \Exception $e ) {
+            error_log( 'ERROR: Failed to create roles: ' . $e->getMessage() );
         }
 
         // Flush rewrite rules
@@ -58,8 +56,17 @@ class Plugin {
     }
 
     public static function deactivate() {
+        // Remove custom roles on deactivation
+        error_log( 'Employee Manager: Plugin deactivation started. Removing custom roles...' );
+        try {
+            Capabilities::remove_roles();
+            error_log( '✓ Custom roles removed successfully' );
+        } catch ( \Exception $e ) {
+            error_log( 'ERROR: Failed to remove roles: ' . $e->getMessage() );
+        }
+        
         flush_rewrite_rules();
-        error_log( 'Employee Manager: Deactivation hook triggered' );
+        error_log( 'Employee Manager: Plugin deactivated' );
     }
 
     public function load_components() {
@@ -69,6 +76,9 @@ class Plugin {
         $this->admin      = new \EmployeeManager\Admin\EmployeeAdmin();
         $this->settings   = new \EmployeeManager\Settings\Settings();   
 
+        // Ensure roles exist (in case activation hook didn't fire properly)
+        self::ensure_roles_exist();
+
         // Update existing HR Manager role with new capabilities if needed
         self::update_existing_roles();
 
@@ -76,6 +86,16 @@ class Plugin {
         Capabilities::register_media_permissions();
 
         error_log( 'Employee Manager: Plugin components loaded' );
+    }
+
+    /**
+     * Ensure custom roles exist (fallback if activation hook fails)
+     */
+    public static function ensure_roles_exist() {
+        if ( ! get_role( 'hr_manager' ) || ! get_role( 'employee_viewer' ) ) {
+            error_log( 'Employee Manager: Roles missing, recreating them...' );
+            Capabilities::create_roles();
+        }
     }
 
     /**
