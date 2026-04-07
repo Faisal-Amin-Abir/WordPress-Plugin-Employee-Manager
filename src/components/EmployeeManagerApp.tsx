@@ -52,6 +52,7 @@ const EmployeeManagerApp: React.FC = () => {
     });
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
+    const [totalDatabaseItems, setTotalDatabaseItems] = useState(0);
 
     // Sorting state
     const [sortBy, setSortBy] = useState<'full_name' | 'date_joined' | 'id'>('id');
@@ -93,6 +94,13 @@ const EmployeeManagerApp: React.FC = () => {
                 setCurrentPage(empResponse.page || 1);
                 setTotalPages(empResponse.pages || 1);
                 setTotalItems(empResponse.total || 0);
+                
+                // Track total database items (unfiltered count)
+                // If no filters are active, the current total is the database total
+                const hasFilters = search || department || status;
+                if (!hasFilters) {
+                    setTotalDatabaseItems(empResponse.total || 0);
+                }
 
                 // Fetch settings from custom endpoint (allows both admins and managers)
                 try {
@@ -307,7 +315,8 @@ const EmployeeManagerApp: React.FC = () => {
 
     // Check if any filters are active
     const hasActiveFilters = searchTerm || filterDepartment || filterStatus;
-    const filteredCount = filteredEmployees.length;
+    // Show: filtered count of total database count
+    // Example: "Result: 10 of 15" means 10 items match filters out of 15 total
 
     return (
         <ThemeProvider pluginId="employee-manager">
@@ -398,7 +407,7 @@ const EmployeeManagerApp: React.FC = () => {
                                     {hasActiveFilters ? (
                                         <>
                                             <span style={{ fontSize: '13px', color: '#555' }}>
-                                                Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
+                                                Result: <strong>{totalItems}</strong> of <strong>{totalDatabaseItems}</strong>
                                             </span>
                                             <Button 
                                                 variant="tertiary"
@@ -462,7 +471,7 @@ const EmployeeManagerApp: React.FC = () => {
                                 {hasActiveFilters ? (
                                     <>
                                         <span style={{ fontSize: '13px', color: '#555' }}>
-                                            Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
+                                            Result: <strong>{totalItems}</strong> of <strong>{totalDatabaseItems}</strong>
                                         </span>
                                         <Button 
                                             variant="tertiary"
