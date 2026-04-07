@@ -258,6 +258,11 @@ const EmployeeManagerApp: React.FC = () => {
         setBulkAction('');
     };
 
+    // Check if any filters are active
+    const hasActiveFilters = searchTerm || filterDepartment || filterStatus;
+    const activeEmployeesCount = employees.length;
+    const filteredCount = filteredEmployees.length;
+
     return (
         <ThemeProvider pluginId="employee-manager">
             <div style={{ padding: '20px' }}>
@@ -306,40 +311,68 @@ const EmployeeManagerApp: React.FC = () => {
                     </div>
 
                     {/* Bulk Actions Row - WordPress Style */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <SelectControl
-                            label=""
-                            value={bulkAction}
-                            options={[
-                                { label: 'Bulk Actions', value: '' },
-                                { label: '→ Mark as Active', value: 'active' },
-                                { label: '→ Mark as Inactive', value: 'inactive' },
-                                { label: '→ Delete', value: 'delete' },
-                            ]}
-                            onChange={setBulkAction}
-                            disabled={selectedIds.length === 0 || !canManage}
-                            style={{ minWidth: '200px' }}
-                        />
-                        <Button 
-                            variant="primary"
-                            onClick={applyBulkAction}
-                            disabled={!bulkAction || selectedIds.length === 0 || !canManage}
-                            style={{ color: 'white' }}
-                        >
-                            Apply
-                        </Button>
-                        {selectedIds.length > 0 && (
-                            <span style={{ 
-                                background: '#0073aa', 
-                                color: 'white', 
-                                padding: '4px 12px', 
-                                borderRadius: '12px', 
-                                fontSize: '13px',
-                                fontWeight: '500'
-                            }}>
-                                {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
-                            </span>
-                        )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <SelectControl
+                                label=""
+                                value={bulkAction}
+                                options={[
+                                    { label: 'Bulk Actions', value: '' },
+                                    { label: '→ Mark as Active', value: 'active' },
+                                    { label: '→ Mark as Inactive', value: 'inactive' },
+                                    { label: '→ Delete', value: 'delete' },
+                                ]}
+                                onChange={setBulkAction}
+                                disabled={selectedIds.length === 0 || !canManage}
+                                style={{ minWidth: '200px' }}
+                            />
+                            <Button 
+                                variant="primary"
+                                onClick={applyBulkAction}
+                                disabled={!bulkAction || selectedIds.length === 0 || !canManage}
+                                style={{ color: 'white' }}
+                            >
+                                Apply
+                            </Button>
+                            {selectedIds.length > 0 && (
+                                <span style={{ 
+                                    background: '#0073aa', 
+                                    color: 'white', 
+                                    padding: '4px 12px', 
+                                    borderRadius: '12px', 
+                                    fontSize: '13px',
+                                    fontWeight: '500'
+                                }}>
+                                    {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Member Count Display - Right Side */}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {hasActiveFilters ? (
+                                <>
+                                    <span style={{ fontSize: '13px', color: '#555' }}>
+                                        Showing <strong>{filteredCount}</strong> of <strong>{activeEmployeesCount}</strong>
+                                    </span>
+                                    <Button 
+                                        variant="tertiary"
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setFilterDepartment('');
+                                            setFilterStatus('');
+                                        }}
+                                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                                    >
+                                        Clear
+                                    </Button>
+                                </>
+                            ) : (
+                                <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
+                                    Total: <strong>{activeEmployeesCount}</strong>
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {error && <Notice status="error" isDismissible onDismiss={() => setError(null)}>{error}</Notice>}
