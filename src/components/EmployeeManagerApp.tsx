@@ -71,7 +71,7 @@ const EmployeeManagerApp: React.FC = () => {
                 setEmployees(empResponse.data || []);
                 setCurrentPage(empResponse.page || 1);
                 setTotalPages(empResponse.pages || 1);
-                setTotalItems((empResponse.pages || 1) * itemsPerPage);
+                setTotalItems(empResponse.total || 0);
 
                 // Fetch settings from custom endpoint (allows both admins and managers)
                 try {
@@ -260,7 +260,6 @@ const EmployeeManagerApp: React.FC = () => {
 
     // Check if any filters are active
     const hasActiveFilters = searchTerm || filterDepartment || filterStatus;
-    const activeEmployeesCount = employees.length;
     const filteredCount = filteredEmployees.length;
 
     return (
@@ -353,7 +352,7 @@ const EmployeeManagerApp: React.FC = () => {
                             {hasActiveFilters ? (
                                 <>
                                     <span style={{ fontSize: '13px', color: '#555' }}>
-                                        Showing <strong>{filteredCount}</strong> of <strong>{activeEmployeesCount}</strong>
+                                        Showing <strong>{filteredCount}</strong> of <strong>{totalItems}</strong>
                                     </span>
                                     <Button 
                                         variant="tertiary"
@@ -369,7 +368,7 @@ const EmployeeManagerApp: React.FC = () => {
                                 </>
                             ) : (
                                 <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
-                                    Total: <strong>{activeEmployeesCount}</strong>
+                                    Total: <strong>{totalItems}</strong>
                                 </span>
                             )}
                         </div>
