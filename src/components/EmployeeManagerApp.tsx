@@ -46,49 +46,61 @@ const EmployeeManagerApp: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
 
+    // Sorting state
+    const [sortBy, setSortBy] = useState<'full_name' | 'date_joined' | 'id'>('id');
+    const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+
     // Initialize form data from schema
     const [formData, setFormData] = useState<any>(() => generateInitialFormData(schema));
 
-    const fetchData = useCallback(async (page: number = 1, itemsPerPage: number = perPage) => {
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            const empResponse = await apiFetch({
-                path: `employee-manager/v1/employees?page=${page}&per_page=${itemsPerPage}`,
-            }) as any;
-            
-            setEmployees(empResponse.data || []);
-            setCurrentPage(empResponse.page || 1);
-            setTotalPages(empResponse.pages || 1);
-            setTotalItems((empResponse.pages || 1) * itemsPerPage);
-
-            // Fetch settings from custom endpoint (allows both admins and managers)
+    const fetchData = useCallback(
+        async (
+            page: number = 1, 
+            itemsPerPage: number = perPage,
+            sortByParam: 'full_name' | 'date_joined' | 'id' = sortBy,
+            sortOrderParam: 'ASC' | 'DESC' = sortOrder
+        ) => {
             try {
-                const settingsResponse = await apiFetch({
-                    path: 'employee-manager/v1/settings',
-                }) as any;
+                setIsLoading(true);
+                setError(null);
 
-                if (settingsResponse.data && settingsResponse.data.employee_manager_max_upload_mb) {
-                    const maxMB = settingsResponse.data.employee_manager_max_upload_mb;
-                    setMaxUploadMB(maxMB);
-                } else {
+                const empResponse = await apiFetch({
+                    path: `employee-manager/v1/employees?page=${page}&per_page=${itemsPerPage}&sort_by=${sortByParam}&sort_order=${sortOrderParam}`,
+                }) as any;
+                
+                setEmployees(empResponse.data || []);
+                setCurrentPage(empResponse.page || 1);
+                setTotalPages(empResponse.pages || 1);
+                setTotalItems((empResponse.pages || 1) * itemsPerPage);
+
+                // Fetch settings from custom endpoint (allows both admins and managers)
+                try {
+                    const settingsResponse = await apiFetch({
+                        path: 'employee-manager/v1/settings',
+                    }) as any;
+
+                    if (settingsResponse.data && settingsResponse.data.employee_manager_max_upload_mb) {
+                        const maxMB = settingsResponse.data.employee_manager_max_upload_mb;
+                        setMaxUploadMB(maxMB);
+                    } else {
+                        setMaxUploadMB(2);
+                    }
+                } catch (settingsErr: any) {
+                    // Log settings fetch error but don't display it to user
+                    console.warn('Could not fetch settings:', settingsErr.message);
+                    // Use default value
                     setMaxUploadMB(2);
                 }
-            } catch (settingsErr: any) {
-                // Log settings fetch error but don't display it to user
-                console.warn('Could not fetch settings:', settingsErr.message);
-                // Use default value
-                setMaxUploadMB(2);
-            }
 
-            setSelectedIds([]);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load data');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [perPage]);
+                setSelectedIds([]);
+            } catch (err: any) {
+                setError(err.message || 'Failed to load data');
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [perPage, sortBy, sortOrder]
+    );
 
     useEffect(() => {
         fetchData(currentPage, perPage);
@@ -123,6 +135,22 @@ const EmployeeManagerApp: React.FC = () => {
         setIsViewModalOpen(true);
     };
 
+    const handleSort = (column: 'full_name' | 'date_joined') => {
+        // If clicking the same column, toggle sort order
+        if (sortBy === column) {
+            const newOrder = sortOrder === 'ASC' ? 'DESC' : 'ASC';
+            setSortOrder(newOrder);
+            setCurrentPage(1);
+            fetchData(1, perPage, column, newOrder);
+        } else {
+            // If clicking a new column, sort by that column in ASC order
+            setSortBy(column);
+            setSortOrder('ASC');
+            setCurrentPage(1);
+            fetchData(1, perPage, column, 'ASC');
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!canManage) return;
@@ -145,7 +173,7 @@ const EmployeeManagerApp: React.FC = () => {
             }
 
             setIsModalOpen(false);
-            fetchData(currentPage, perPage);
+            fetchData(currentPage, perPage, sortBy, sortOrder);
         } catch (err: any) {
             alert('Error: ' + (err.message || 'Failed to save employee'));
         } finally {
@@ -191,7 +219,7 @@ const EmployeeManagerApp: React.FC = () => {
             setSelectedIds([]);
             // Reset to page 1 after bulk delete
             setCurrentPage(1);
-            fetchData(1, perPage);
+            fetchData(1, perPage, sortBy, sortOrder);
         } catch (err: any) {
             alert('Bulk delete failed');
         }
@@ -208,7 +236,7 @@ const EmployeeManagerApp: React.FC = () => {
             });
             setSelectedIds([]);
             setBulkAction('');
-            fetchData(currentPage, perPage);
+            fetchData(currentPage, perPage, sortBy, sortOrder);
         } catch (err: any) {
             alert('Bulk status change failed');
         }
@@ -335,10 +363,13 @@ const EmployeeManagerApp: React.FC = () => {
                                         apiFetch({
                                             path: `employee-manager/v1/employees/${emp.id}`,
                                             method: 'DELETE',
-                                        }).then(() => fetchData(currentPage, perPage));
+                                        }).then(() => fetchData(currentPage, perPage, sortBy, sortOrder));
                                     }
                                 } : undefined}
                                 canManage={canManage}
+                                onSort={handleSort}
+                                sortBy={sortBy}
+                                sortOrder={sortOrder}
                             />
                             
                             {/* Pagination Controls */}
@@ -369,7 +400,7 @@ const EmployeeManagerApp: React.FC = () => {
                                         const newPerPage = parseInt(val);
                                         setPerPage(newPerPage);
                                         setCurrentPage(1);
-                                        fetchData(1, newPerPage);
+                                        fetchData(1, newPerPage, sortBy, sortOrder);
                                     }}
                                     style={{ minWidth: '120px' }}
                                 />
@@ -384,28 +415,28 @@ const EmployeeManagerApp: React.FC = () => {
                                 
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <Button
-                                        onClick={() => fetchData(1, perPage)}
+                                        onClick={() => fetchData(1, perPage, sortBy, sortOrder)}
                                         disabled={currentPage === 1 || isLoading}
                                         variant="secondary"
                                     >
                                         « First
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(currentPage - 1, perPage)}
+                                        onClick={() => fetchData(currentPage - 1, perPage, sortBy, sortOrder)}
                                         disabled={currentPage === 1 || isLoading}
                                         variant="secondary"
                                     >
                                         ‹ Previous
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(currentPage + 1, perPage)}
+                                        onClick={() => fetchData(currentPage + 1, perPage, sortBy, sortOrder)}
                                         disabled={currentPage >= totalPages || isLoading}
                                         variant="secondary"
                                     >
                                         Next ›
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(totalPages, perPage)}
+                                        onClick={() => fetchData(totalPages, perPage, sortBy, sortOrder)}
                                         disabled={currentPage >= totalPages || isLoading}
                                         variant="secondary"
                                     >

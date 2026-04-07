@@ -11,6 +11,9 @@ interface EmployeeTableProps {
     onView: (employee: Employee) => void;
     onDelete?: (employee: Employee) => void;
     canManage: boolean;
+    onSort?: (column: 'full_name' | 'date_joined') => void;
+    sortBy?: 'full_name' | 'date_joined' | 'id';
+    sortOrder?: 'ASC' | 'DESC';
 }
 
 const EmployeeTable: React.FC<EmployeeTableProps> = ({
@@ -22,7 +25,43 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
     onView,
     onDelete,
     canManage,
+    onSort,
+    sortBy,
+    sortOrder,
 }) => {
+    const renderSortableHeader = (label: string, column: 'full_name' | 'date_joined') => {
+        const isSorted = sortBy === column;
+        const sortIcon = isSorted ? (sortOrder === 'ASC' ? '▲' : '▼') : '⇅';
+        const iconOpacity = isSorted ? '1' : '0.4';
+        
+        return (
+            <th 
+                onClick={() => onSort?.(column)}
+                style={{ 
+                    padding: '12px', 
+                    textAlign: 'left', 
+                    border: '1px solid #ddd',
+                    cursor: 'pointer',
+                    background: '#f8f9fa',
+                    fontWeight: '600',
+                    userSelect: 'none',
+                    transition: 'background-color 0.2s'
+                }}
+                title="Click to sort"
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#eef7ff';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                }}
+            >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {label}
+                    <span style={{ fontSize: '11px', lineHeight: '1', opacity: iconOpacity, transition: 'opacity 0.2s' }}>{sortIcon}</span>
+                </span>
+            </th>
+        );
+    };
     return (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -34,12 +73,12 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({
                         />
                     </th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Photo</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Full Name</th>
+                    {renderSortableHeader('Full Name', 'full_name')}
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Email</th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Department</th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Job Title</th>
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Salary</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Date Joined</th>
+                    {renderSortableHeader('Date Joined', 'date_joined')}
                     <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Status</th>
                     <th style={{ padding: '12px', textAlign: 'center', border: '1px solid #ddd' }}>Actions</th>
                 </tr>

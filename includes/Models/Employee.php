@@ -22,6 +22,8 @@ class Employee {
         $search = '';
         $department = '';
         $status = '';
+        $sort_by = 'id';
+        $sort_order = 'DESC';
 
         // Handle array parameter (modern approach)
         if ( is_array( $per_page ) ) {
@@ -31,6 +33,19 @@ class Employee {
             $search = sanitize_text_field( $params['search'] ?? '' );
             $department = sanitize_text_field( $params['department'] ?? '' );
             $status = sanitize_text_field( $params['status'] ?? '' );
+            $sort_by = sanitize_key( $params['sort_by'] ?? 'id' );
+            $sort_order = strtoupper( sanitize_key( $params['sort_order'] ?? 'DESC' ) );
+            
+            // Validate sort_by to prevent SQL injection
+            $allowed_cols = ['id', 'full_name', 'email', 'department', 'date_joined', 'status', 'created_at'];
+            if ( ! in_array( $sort_by, $allowed_cols, true ) ) {
+                $sort_by = 'id';
+            }
+            
+            // Validate sort_order
+            if ( ! in_array( $sort_order, ['ASC', 'DESC'], true ) ) {
+                $sort_order = 'DESC';
+            }
         } else {
             // Handle individual parameters (backward compatibility)
             $per_page = (int) $per_page;
@@ -61,8 +76,8 @@ class Employee {
 
         $where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 
-        // Get results
-        $query = "SELECT * FROM {$this->table_name} {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+        // Get results - use dynamic sorting
+        $query = "SELECT * FROM {$this->table_name} {$where_sql} ORDER BY {$sort_by} {$sort_order} LIMIT %d OFFSET %d";
         $prepared_query = $this->wpdb->prepare( $query, array_merge( $where_values, [ $per_page, $offset ] ) );
         $results = $this->wpdb->get_results( $prepared_query );
 
@@ -84,7 +99,9 @@ class Employee {
             'total'       => $total,
             'per_page'    => $per_page,
             'page'        => $page,
-            'total_pages' => ceil( $total / $per_page )
+            'total_pages' => ceil( $total / $per_page ),
+            'sort_by'     => $sort_by,
+            'sort_order'  => $sort_order
         ];
     }
 

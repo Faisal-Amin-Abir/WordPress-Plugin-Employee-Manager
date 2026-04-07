@@ -103,19 +103,21 @@ class RestController {
             'search'     => $request->get_param( 'search' ) ?? '',
             'department' => $request->get_param( 'department' ) ?? '',
             'status'     => $request->get_param( 'status' ) ?? '',
-            'orderby'    => $request->get_param( 'orderby' ) ?? 'id',
-            'order'      => strtoupper( $request->get_param( 'order' ) ?? 'DESC' ),
+            'sort_by'    => $request->get_param( 'sort_by' ) ?? 'id',
+            'sort_order' => strtoupper( $request->get_param( 'sort_order' ) ?? 'DESC' ),
         ];
 
         $result = $this->employee_model->get_all( $params );
 
         return new WP_REST_Response( [
-            'success' => true,
-            'data'    => $result['items'],
-            'total'   => $result['total'],
-            'pages'   => $result['total_pages'],
-            'per_page'=> $result['per_page'],
-            'page'    => $result['page'],
+            'success'   => true,
+            'data'      => $result['items'],
+            'total'     => $result['total'],
+            'pages'     => $result['total_pages'],
+            'per_page'  => $result['per_page'],
+            'page'      => $result['page'],
+            'sort_by'   => $result['sort_by'],
+            'sort_order'=> $result['sort_order'],
         ], 200 );
     }
 
