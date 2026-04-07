@@ -4,24 +4,21 @@ namespace EmployeeManager\Database;
 class Manager {
 
     /**
-     * Create table only if it doesn't exist
+     * Create table during plugin activation
      * Made static for activation hook
      */
     public static function create_table() {
         global $wpdb;
 
         $table_name = $wpdb->prefix . 'employee_manager';
-
-        // Check if table already exists
-        if ( self::table_exists() ) {
-            error_log( "Employee Manager: Table {$table_name} already exists. Skipping creation." );
-            return;
-        }
+        
+        error_log( "Employee Manager: Starting table creation..." );
+        error_log( "Employee Manager: Table name: {$table_name}" );
 
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE $table_name (
-            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             full_name VARCHAR(255) NOT NULL,
             email VARCHAR(100) NOT NULL UNIQUE,
             phone VARCHAR(50) DEFAULT NULL,
@@ -33,21 +30,32 @@ class Manager {
             status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            UNIQUE KEY email (email),
             KEY department (department),
             KEY status (status),
             KEY date_joined (date_joined)
-        ) $charset_collate;";
+        ) {$charset_collate};";
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        dbDelta( $sql );
+        error_log( "Employee Manager: Executing SQL: " . substr( $sql, 0, 150 ) . "..." );
 
-        // Final verification
-        if ( self::table_exists() ) {
-            error_log( "Employee Manager: Table {$table_name} created successfully." );
+        // Execute the SQL
+        $result = $wpdb->query( $sql );
+        
+        error_log( "Employee Manager: Query result: " . ( $result === false ? 'FALSE' : $result ) );
+        
+        if ( $result === false ) {
+            error_log( "Employee Manager: SQL Error - " . $wpdb->last_error );
+            return false;
+        }
+
+        // Verify table was created
+        $table_check = $wpdb->get_var( "SHOW TABLES LIKE '{$table_name}'" );
+        
+        if ( $table_check === $table_name ) {
+            error_log( "Employee Manager: ✓ Table {$table_name} created successfully!" );
+            return true;
         } else {
-            error_log( "Employee Manager: Failed to create table {$table_name}." );
+            error_log( "Employee Manager: ✗ Table verification failed. Table not found in database." );
+            return false;
         }
     }
 
@@ -59,10 +67,7 @@ class Manager {
         global $wpdb;
         $table_name = $wpdb->prefix . 'employee_manager';
 
-        $result = $wpdb->get_var( $wpdb->prepare(
-            "SHOW TABLES LIKE %s", 
-            $table_name
-        ) );
+        $result = $wpdb->get_var( "SHOW TABLES LIKE '{$table_name}'" );
 
         return $result === $table_name;
     }

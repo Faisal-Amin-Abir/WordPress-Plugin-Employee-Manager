@@ -23,10 +23,12 @@ class Plugin {
     }
 
     private function init() {
-        register_activation_hook( EMPLOYEE_MANAGER_PLUGIN_FILE, [ __CLASS__, 'activate' ] );
-        register_deactivation_hook( EMPLOYEE_MANAGER_PLUGIN_FILE, [ __CLASS__, 'deactivate' ] );
-
+        // Note: Activation and deactivation hooks are registered in the main plugin file
+        // to ensure they fire at the right time
+        
         add_action( 'plugins_loaded', [ $this, 'load_components' ] );
+        // Extra safety check - ensure table exists on every load
+        add_action( 'plugins_loaded', [ __CLASS__, 'ensure_table_exists' ], 1 );
     }
 
     /**
@@ -92,12 +94,22 @@ class Plugin {
     }
 
     /**
-     * Ensure custom roles exist (fallback if activation hook fails)
+     * Ensure roles exist (fallback if activation hook fails)
      */
     public static function ensure_roles_exist() {
         if ( ! get_role( 'hr_manager' ) || ! get_role( 'employee_viewer' ) ) {
             error_log( 'Employee Manager: Roles missing, recreating them...' );
             Capabilities::create_roles();
+        }
+    }
+
+    /**
+     * Ensure table exists (fallback if activation hook fails)
+     */
+    public static function ensure_table_exists() {
+        if ( ! DatabaseManager::table_exists() ) {
+            error_log( 'Employee Manager: Table missing on plugins_loaded, creating now...' );
+            DatabaseManager::create_table();
         }
     }
 
