@@ -42,7 +42,14 @@ const EmployeeManagerApp: React.FC = () => {
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const [perPage, setPerPage] = useState(10);
+    // Initialize perPage from localStorage or default to 10
+    const [perPage, setPerPage] = useState<number>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('employeeManager_perPage');
+            return saved ? parseInt(saved, 10) : 10;
+        }
+        return 10;
+    });
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
 
@@ -58,14 +65,28 @@ const EmployeeManagerApp: React.FC = () => {
             page: number = 1, 
             itemsPerPage: number = perPage,
             sortByParam: 'full_name' | 'date_joined' | 'id' = sortBy,
-            sortOrderParam: 'ASC' | 'DESC' = sortOrder
+            sortOrderParam: 'ASC' | 'DESC' = sortOrder,
+            search: string = searchTerm,
+            department: string = filterDepartment,
+            status: string = filterStatus
         ) => {
             try {
                 setIsLoading(true);
                 setError(null);
 
+                // Build query parameters including filters
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    per_page: itemsPerPage.toString(),
+                    sort_by: sortByParam,
+                    sort_order: sortOrderParam,
+                    ...(search && { search }),
+                    ...(department && { department }),
+                    ...(status && { status }),
+                });
+
                 const empResponse = await apiFetch({
-                    path: `employee-manager/v1/employees?page=${page}&per_page=${itemsPerPage}&sort_by=${sortByParam}&sort_order=${sortOrderParam}`,
+                    path: `employee-manager/v1/employees?${params.toString()}`,
                 }) as any;
                 
                 setEmployees(empResponse.data || []);
@@ -101,6 +122,11 @@ const EmployeeManagerApp: React.FC = () => {
         },
         [perPage, sortBy, sortOrder]
     );
+
+    // Persist perPage to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('employeeManager_perPage', perPage.toString());
+    }, [perPage]);
 
     useEffect(() => {
         fetchData(currentPage, perPage);
@@ -206,6 +232,27 @@ const EmployeeManagerApp: React.FC = () => {
         );
     };
 
+    // Handle search filter change - reset to page 1 and fetch with new search
+    const handleSearchChange = (newSearchTerm: string) => {
+        setSearchTerm(newSearchTerm);
+        setCurrentPage(1);
+        fetchData(1, perPage, sortBy, sortOrder, newSearchTerm, filterDepartment, filterStatus);
+    };
+
+    // Handle department filter change - reset to page 1 and fetch with new department
+    const handleDepartmentChange = (newDepartment: string) => {
+        setFilterDepartment(newDepartment);
+        setCurrentPage(1);
+        fetchData(1, perPage, sortBy, sortOrder, searchTerm, newDepartment, filterStatus);
+    };
+
+    // Handle status filter change - reset to page 1 and fetch with new status
+    const handleStatusChange = (newStatus: string) => {
+        setFilterStatus(newStatus);
+        setCurrentPage(1);
+        fetchData(1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, newStatus);
+    };
+
     const bulkDelete = async () => {
         if (!canManage || selectedIds.length === 0) return;
         if (!confirm(`Delete ${selectedIds.length} selected employees?`)) return;
@@ -277,7 +324,7 @@ const EmployeeManagerApp: React.FC = () => {
                                 <TextControl
                                     placeholder="Search by name or email"
                                     value={searchTerm}
-                                    onChange={setSearchTerm}
+                                    onChange={handleSearchChange}
                                     style={{ width: '300px' }}
                                 />
                             </div>
@@ -332,7 +379,7 @@ const EmployeeManagerApp: React.FC = () => {
                                             { label: 'Operations', value: 'Operations' },
                                             { label: 'Other', value: 'Other' },
                                         ]}
-                                        onChange={setFilterDepartment}
+                                        onChange={handleDepartmentChange}
                                     />
                                     <SelectControl
                                         label="Status"
@@ -342,7 +389,7 @@ const EmployeeManagerApp: React.FC = () => {
                                             { label: 'Active', value: 'active' },
                                             { label: 'Inactive', value: 'inactive' },
                                         ]}
-                                        onChange={setFilterStatus}
+                                        onChange={handleStatusChange}
                                     />
                                 </div>
 
@@ -390,7 +437,7 @@ const EmployeeManagerApp: React.FC = () => {
                                         { label: 'Operations', value: 'Operations' },
                                         { label: 'Other', value: 'Other' },
                                     ]}
-                                    onChange={setFilterDepartment}
+                                    onChange={handleDepartmentChange}
                                 />
                                 <SelectControl
                                     label="Status"
@@ -400,12 +447,12 @@ const EmployeeManagerApp: React.FC = () => {
                                         { label: 'Active', value: 'active' },
                                         { label: 'Inactive', value: 'inactive' },
                                     ]}
-                                    onChange={setFilterStatus}
+                                    onChange={handleStatusChange}
                                 />
                                 <TextControl
                                     placeholder="Search by name or email"
                                     value={searchTerm}
-                                    onChange={setSearchTerm}
+                                    onChange={handleSearchChange}
                                     style={{ width: '200px', flexShrink: 0 }}
                                 />
                             </div>
@@ -496,6 +543,8 @@ const EmployeeManagerApp: React.FC = () => {
                                         const newPerPage = parseInt(val);
                                         setPerPage(newPerPage);
                                         setCurrentPage(1);
+                                        // Save to localStorage
+                                        localStorage.setItem('employeeManager_perPage', newPerPage.toString());
                                         fetchData(1, newPerPage, sortBy, sortOrder);
                                     }}
                                     style={{ minWidth: '120px' }}
