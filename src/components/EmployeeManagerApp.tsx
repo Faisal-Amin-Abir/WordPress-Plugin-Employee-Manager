@@ -51,8 +51,8 @@ const EmployeeManagerApp: React.FC = () => {
         return 10;
     });
     const [totalPages, setTotalPages] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
-    const [totalDatabaseItems, setTotalDatabaseItems] = useState(0);
+    const [totalFilteredItems, setTotalFilteredItems] = useState(0);  // Items matching filters
+    const [totalDatabaseItems, setTotalDatabaseItems] = useState(0);  // Total in database
 
     // Sorting state
     const [sortBy, setSortBy] = useState<'full_name' | 'date_joined' | 'id'>('id');
@@ -61,7 +61,7 @@ const EmployeeManagerApp: React.FC = () => {
     // Initialize form data from schema
     const [formData, setFormData] = useState<any>(() => generateInitialFormData(schema));
 
-    const fetchData = useCallback(
+    const fetchPageData = useCallback(
         async (
             page: number = 1, 
             itemsPerPage: number = perPage,
@@ -69,10 +69,11 @@ const EmployeeManagerApp: React.FC = () => {
             sortOrderParam: 'ASC' | 'DESC' = sortOrder,
             search: string = searchTerm,
             department: string = filterDepartment,
-            status: string = filterStatus
+            status: string = filterStatus,
+            showLoading: boolean = true  // Controls loading spinner display
         ) => {
             try {
-                setIsLoading(true);
+                if (showLoading) setIsLoading(true);
                 setError(null);
 
                 // Build query parameters including filters
@@ -90,46 +91,51 @@ const EmployeeManagerApp: React.FC = () => {
                     path: `employee-manager/v1/employees?${params.toString()}`,
                 }) as any;
                 
+                // Update table data
                 setEmployees(empResponse.data || []);
                 setCurrentPage(empResponse.page || 1);
                 setTotalPages(empResponse.pages || 1);
-                setTotalItems(empResponse.total || 0);
                 
-                // Track total database items (unfiltered count)
-                // If no filters are active, the current total is the database total
-                const hasFilters = search || department || status;
-                if (!hasFilters) {
-                    setTotalDatabaseItems(empResponse.total || 0);
-                }
-
-                // Fetch settings from custom endpoint (allows both admins and managers)
-                try {
-                    const settingsResponse = await apiFetch({
-                        path: 'employee-manager/v1/settings',
-                    }) as any;
-
-                    if (settingsResponse.data && settingsResponse.data.employee_manager_max_upload_mb) {
-                        const maxMB = settingsResponse.data.employee_manager_max_upload_mb;
-                        setMaxUploadMB(maxMB);
-                    } else {
-                        setMaxUploadMB(2);
-                    }
-                } catch (settingsErr: any) {
-                    // Log settings fetch error but don't display it to user
-                    console.warn('Could not fetch settings:', settingsErr.message);
-                    // Use default value
-                    setMaxUploadMB(2);
-                }
+                // Update counts from API response
+                // total_filtered = items matching filters
+                // total_database = total items in database
+                setTotalFilteredItems(empResponse.total_filtered || 0);
+                setTotalDatabaseItems(empResponse.total_database || 0);
 
                 setSelectedIds([]);
             } catch (err: any) {
                 setError(err.message || 'Failed to load data');
             } finally {
-                setIsLoading(false);
+                if (showLoading) setIsLoading(false);
             }
         },
         [perPage, sortBy, sortOrder]
     );
+
+    // Fetch settings once on component mount
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settingsResponse = await apiFetch({
+                    path: 'employee-manager/v1/settings',
+                }) as any;
+
+                if (settingsResponse.data && settingsResponse.data.employee_manager_max_upload_mb) {
+                    const maxMB = settingsResponse.data.employee_manager_max_upload_mb;
+                    setMaxUploadMB(maxMB);
+                } else {
+                    setMaxUploadMB(2);
+                }
+            } catch (settingsErr: any) {
+                // Log settings fetch error but don't display it to user
+                console.warn('Could not fetch settings:', settingsErr.message);
+                // Use default value
+                setMaxUploadMB(2);
+            }
+        };
+
+        fetchSettings();
+    }, []); // Empty dependency array - fetch only once on mount
 
     // Persist perPage to localStorage whenever it changes
     useEffect(() => {
@@ -137,8 +143,9 @@ const EmployeeManagerApp: React.FC = () => {
     }, [perPage]);
 
     useEffect(() => {
-        fetchData(currentPage, perPage);
-    }, [fetchData, currentPage, perPage]);
+        // Call fetchPageData with all filter parameters to ensure consistency
+        fetchPageData(currentPage, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus);
+    }, [fetchPageData, currentPage, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus]);
 
     const filteredEmployees = employees.filter(emp => {
         const matchesSearch = !searchTerm || 
@@ -175,13 +182,13 @@ const EmployeeManagerApp: React.FC = () => {
             const newOrder = sortOrder === 'ASC' ? 'DESC' : 'ASC';
             setSortOrder(newOrder);
             setCurrentPage(1);
-            fetchData(1, perPage, column, newOrder);
+            fetchPageData(1, perPage, column, newOrder, searchTerm, filterDepartment, filterStatus);
         } else {
             // If clicking a new column, sort by that column in ASC order
             setSortBy(column);
             setSortOrder('ASC');
             setCurrentPage(1);
-            fetchData(1, perPage, column, 'ASC');
+            fetchPageData(1, perPage, column, 'ASC', searchTerm, filterDepartment, filterStatus);
         }
     };
 
@@ -207,7 +214,7 @@ const EmployeeManagerApp: React.FC = () => {
             }
 
             setIsModalOpen(false);
-            fetchData(currentPage, perPage, sortBy, sortOrder);
+            fetchPageData(currentPage, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus);
         } catch (err: any) {
             alert('Error: ' + (err.message || 'Failed to save employee'));
         } finally {
@@ -244,21 +251,21 @@ const EmployeeManagerApp: React.FC = () => {
     const handleSearchChange = (newSearchTerm: string) => {
         setSearchTerm(newSearchTerm);
         setCurrentPage(1);
-        fetchData(1, perPage, sortBy, sortOrder, newSearchTerm, filterDepartment, filterStatus);
+        fetchPageData(1, perPage, sortBy, sortOrder, newSearchTerm, filterDepartment, filterStatus);
     };
 
     // Handle department filter change - reset to page 1 and fetch with new department
     const handleDepartmentChange = (newDepartment: string) => {
         setFilterDepartment(newDepartment);
         setCurrentPage(1);
-        fetchData(1, perPage, sortBy, sortOrder, searchTerm, newDepartment, filterStatus);
+        fetchPageData(1, perPage, sortBy, sortOrder, searchTerm, newDepartment, filterStatus);
     };
 
     // Handle status filter change - reset to page 1 and fetch with new status
     const handleStatusChange = (newStatus: string) => {
         setFilterStatus(newStatus);
         setCurrentPage(1);
-        fetchData(1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, newStatus);
+        fetchPageData(1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, newStatus);
     };
 
     const bulkDelete = async () => {
@@ -274,7 +281,7 @@ const EmployeeManagerApp: React.FC = () => {
             setSelectedIds([]);
             // Reset to page 1 after bulk delete
             setCurrentPage(1);
-            fetchData(1, perPage, sortBy, sortOrder);
+            fetchPageData(1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false);
         } catch (err: any) {
             alert('Bulk delete failed');
         }
@@ -291,7 +298,7 @@ const EmployeeManagerApp: React.FC = () => {
             });
             setSelectedIds([]);
             setBulkAction('');
-            fetchData(currentPage, perPage, sortBy, sortOrder);
+            fetchPageData(currentPage, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false);
         } catch (err: any) {
             alert('Bulk status change failed');
         }
@@ -407,7 +414,7 @@ const EmployeeManagerApp: React.FC = () => {
                                     {hasActiveFilters ? (
                                         <>
                                             <span style={{ fontSize: '13px', color: '#555' }}>
-                                                Result: <strong>{totalItems}</strong> of <strong>{totalDatabaseItems}</strong>
+                                                Result: <strong>{totalFilteredItems}</strong> of <strong>{totalDatabaseItems}</strong>
                                             </span>
                                             <Button 
                                                 variant="tertiary"
@@ -415,6 +422,9 @@ const EmployeeManagerApp: React.FC = () => {
                                                     setSearchTerm('');
                                                     setFilterDepartment('');
                                                     setFilterStatus('');
+                                                    setCurrentPage(1);
+                                                    // Fetch data with cleared filters from page 1
+                                                    fetchPageData(1, perPage, sortBy, sortOrder, '', '', '');
                                                 }}
                                                 style={{ padding: '2px 8px', fontSize: '11px' }}
                                             >
@@ -423,7 +433,7 @@ const EmployeeManagerApp: React.FC = () => {
                                         </>
                                     ) : (
                                         <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
-                                            Total: <strong>{totalItems}</strong>
+                                            Total: <strong>{totalFilteredItems}</strong>
                                         </span>
                                     )}
                                 </div>
@@ -471,7 +481,7 @@ const EmployeeManagerApp: React.FC = () => {
                                 {hasActiveFilters ? (
                                     <>
                                         <span style={{ fontSize: '13px', color: '#555' }}>
-                                            Result: <strong>{totalItems}</strong> of <strong>{totalDatabaseItems}</strong>
+                                            Result: <strong>{totalFilteredItems}</strong> of <strong>{totalDatabaseItems}</strong>
                                         </span>
                                         <Button 
                                             variant="tertiary"
@@ -479,6 +489,9 @@ const EmployeeManagerApp: React.FC = () => {
                                                 setSearchTerm('');
                                                 setFilterDepartment('');
                                                 setFilterStatus('');
+                                                setCurrentPage(1);
+                                                // Fetch data with cleared filters from page 1
+                                                fetchPageData(1, perPage, sortBy, sortOrder, '', '', '');
                                             }}
                                             style={{ padding: '2px 8px', fontSize: '11px' }}
                                         >
@@ -487,7 +500,7 @@ const EmployeeManagerApp: React.FC = () => {
                                     </>
                                 ) : (
                                     <span style={{ fontSize: '13px', color: '#0073aa', fontWeight: '600' }}>
-                                        Total: <strong>{totalItems}</strong>
+                                        Total: <strong>{totalFilteredItems}</strong>
                                     </span>
                                 )}
                             </div>
@@ -515,7 +528,7 @@ const EmployeeManagerApp: React.FC = () => {
                                         apiFetch({
                                             path: `employee-manager/v1/employees/${emp.id}`,
                                             method: 'DELETE',
-                                        }).then(() => fetchData(currentPage, perPage, sortBy, sortOrder));
+                                        }).then(() => fetchPageData(currentPage, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false));
                                     }
                                 } : undefined}
                                 canManage={canManage}
@@ -543,6 +556,7 @@ const EmployeeManagerApp: React.FC = () => {
                                 <SelectControl
                                     value={perPage.toString()}
                                     options={[
+                                        { label: '2 items', value: '2' },
                                         { label: '5 items', value: '5' },
                                         { label: '10 items', value: '10' },
                                         { label: '25 items', value: '25' },
@@ -554,7 +568,7 @@ const EmployeeManagerApp: React.FC = () => {
                                         setCurrentPage(1);
                                         // Save to localStorage
                                         localStorage.setItem('employeeManager_perPage', newPerPage.toString());
-                                        fetchData(1, newPerPage, sortBy, sortOrder);
+                                        fetchPageData(1, newPerPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false);
                                     }}
                                     style={{ minWidth: '120px' }}
                                 />
@@ -569,28 +583,28 @@ const EmployeeManagerApp: React.FC = () => {
                                 
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <Button
-                                        onClick={() => fetchData(1, perPage, sortBy, sortOrder)}
+                                        onClick={() => fetchPageData(1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false)}
                                         disabled={currentPage === 1 || isLoading}
                                         variant="secondary"
                                     >
                                         « First
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(currentPage - 1, perPage, sortBy, sortOrder)}
+                                        onClick={() => fetchPageData(currentPage - 1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false)}
                                         disabled={currentPage === 1 || isLoading}
                                         variant="secondary"
                                     >
                                         ‹ Previous
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(currentPage + 1, perPage, sortBy, sortOrder)}
+                                        onClick={() => fetchPageData(currentPage + 1, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false)}
                                         disabled={currentPage >= totalPages || isLoading}
                                         variant="secondary"
                                     >
                                         Next ›
                                     </Button>
                                     <Button
-                                        onClick={() => fetchData(totalPages, perPage, sortBy, sortOrder)}
+                                        onClick={() => fetchPageData(totalPages, perPage, sortBy, sortOrder, searchTerm, filterDepartment, filterStatus, false)}
                                         disabled={currentPage >= totalPages || isLoading}
                                         variant="secondary"
                                     >

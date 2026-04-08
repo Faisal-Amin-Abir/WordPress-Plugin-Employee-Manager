@@ -110,14 +110,15 @@ class RestController {
         $result = $this->employee_model->get_all( $params );
 
         return new WP_REST_Response( [
-            'success'   => true,
-            'data'      => $result['items'],
-            'total'     => $result['total'],
-            'pages'     => $result['total_pages'],
-            'per_page'  => $result['per_page'],
-            'page'      => $result['page'],
-            'sort_by'   => $result['sort_by'],
-            'sort_order'=> $result['sort_order'],
+            'success'        => true,
+            'data'           => $result['items'],
+            'total_filtered' => $result['total'],          // Count with filters applied
+            'total_database' => $result['total_database'], // Total in DB (unfiltered)
+            'pages'          => $result['total_pages'],
+            'per_page'       => $result['per_page'],
+            'page'           => $result['page'],
+            'sort_by'        => $result['sort_by'],
+            'sort_order'     => $result['sort_order'],
         ], 200 );
     }
 
@@ -268,17 +269,17 @@ class RestController {
             ], 400 );
         }
 
-        $employee_model = new \EmployeeManager\Models\Employee();
+       // $employee_model = new \EmployeeManager\Models\Employee();
         $action = sanitize_text_field( $data['action'] );
         $ids = array_map( 'absint', $data['ids'] );
 
         $success = false;
 
         if ( $action === 'delete' ) {
-            $success = $employee_model->bulk_action( $ids, 'delete' );
+            $success = $this->employee_model->bulk_action( $ids, 'delete' );
         } elseif ( $action === 'status' && ! empty( $data['status'] ) ) {
             $status = sanitize_text_field( $data['status'] );
-            $success = $employee_model->bulk_action( $ids, 'status', $status );
+            $success = $this->employee_model->bulk_action( $ids, 'status', $status );
         }
 
         if ( $success ) {

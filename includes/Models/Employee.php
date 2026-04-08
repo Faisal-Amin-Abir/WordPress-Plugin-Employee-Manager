@@ -90,18 +90,23 @@ class Employee {
             }
         }
 
-        // Get total count with filters
+        // Get total count with filters (filtered count)
         $count_query = "SELECT COUNT(*) FROM {$this->table_name} {$where_sql}";
         $total = (int) $this->wpdb->get_var( $this->wpdb->prepare( $count_query, $where_values ) );
 
+        // Get total count without filters (total in database)
+        $total_database_query = "SELECT COUNT(*) FROM {$this->table_name}";
+        $total_database = (int) $this->wpdb->get_var( $total_database_query );
+
         return [
-            'items'       => $results,
-            'total'       => $total,
-            'per_page'    => $per_page,
-            'page'        => $page,
-            'total_pages' => ceil( $total / $per_page ),
-            'sort_by'     => $sort_by,
-            'sort_order'  => $sort_order
+            'items'           => $results,
+            'total'           => $total,
+            'total_database'  => $total_database,
+            'per_page'        => $per_page,
+            'page'            => $page,
+            'total_pages'     => ceil( $total / $per_page ),
+            'sort_by'         => $sort_by,
+            'sort_order'      => $sort_order
         ];
     }
 

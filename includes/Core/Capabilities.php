@@ -132,10 +132,19 @@ class Capabilities {
      */
     public static function allow_attachment_access( $response, $attachment, $request ) {
         if ( self::can_manage() || current_user_can( 'upload_files' ) ) {
-            return $response;
+            return $response;  // HR Manager: Return full data
         }
+        // Regular user: Remove sensitive fields
+        unset( $response->data['author'] );
+        unset( $response->data['modified'] );
         return $response;
     }
+    // public static function allow_attachment_access( $response, $attachment, $request ) {
+    //     if ( self::can_manage() || current_user_can( 'upload_files' ) ) {
+    //         return $response;
+    //     }
+    //     return $response;
+    // }
 
     /**
      * Modify SQL query to allow HR Manager to see all media items
